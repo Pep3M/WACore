@@ -5,7 +5,6 @@
 node_modules/
 progress/
 .opencode/
-bun.lock
 *.md
 !.env.example
 coverage/

@@ -2,14 +2,14 @@
 # WACore - Multi-stage Docker Build
 # ============================================================
 # Stage 1: Dependencies
-FROM oven/bun:1 AS deps
+FROM oven/bun:1.2 AS deps
 WORKDIR /app
 
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile --production --verbose
 
 # Stage 2: Build
-FROM oven/bun:1 AS build
+FROM oven/bun:1.2 AS build
 WORKDIR /app
 
 COPY package.json bun.lock tsconfig.json ./
@@ -19,7 +19,7 @@ COPY src/ ./src/
 ENV NODE_ENV=production
 
 # Stage 3: Runtime
-FROM oven/bun:1-slim AS runtime
+FROM oven/bun:1.2-slim AS runtime
 WORKDIR /app
 
 RUN apt-get update -qq && apt-get install -y -qq curl --no-install-recommends \
