@@ -56,7 +56,7 @@ Una vez conectado, la API REST está disponible en `http://localhost:9878`.
 ### Desde GitHub Container Registry
 
 ```bash
-docker pull ghcr.io/anomalyco/WACore:latest
+docker pull ghcr.io/pep3m/wacore:latest
 
 docker run -d \
   --name wacore \
@@ -65,7 +65,7 @@ docker run -d \
   -e API_KEY=mi-clave-segura \
   -e WA_INSTANCE_NAME=bot-prod \
   -v wa_sessions:/data/sessions \
-  ghcr.io/anomalyco/WACore:latest
+  ghcr.io/pep3m/wacore:latest
 ```
 
 ### Con docker-compose (recomendado)
@@ -74,7 +74,7 @@ docker run -d \
 # docker-compose.yml
 services:
   wacore:
-    image: ghcr.io/anomalyco/WACore:latest
+    image: ghcr.io/pep3m/wacore:latest
     container_name: wacore
     ports:
       - "9877:9877"   # Health check
