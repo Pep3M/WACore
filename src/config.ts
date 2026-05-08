@@ -23,5 +23,10 @@ export function loadConfig(): EnvConfig {
     connectOnStartup: Bun.env.CONNECT_ON_STARTUP !== 'false',
     qrTimeout: parseInt(Bun.env.QR_TIMEOUT || '60000', 10),
     nodeEnv: Bun.env.NODE_ENV || 'production',
+    pollingEnabled: Bun.env.POLLING_ENABLED === 'true',
+    sseEnabled: Bun.env.SSE_ENABLED !== 'false',
+    messageBufferSize: parseInt(Bun.env.MESSAGE_BUFFER_SIZE || '1000', 10),
+    messageBufferTtlMs: parseInt(Bun.env.MESSAGE_BUFFER_TTL_MS || '300000', 10),
+    sseHeartbeatMs: parseInt(Bun.env.SSE_HEARTBEAT_MS || '30000', 10),
   };
 }

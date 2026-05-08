@@ -27,6 +27,10 @@
 | INFRA-01.2 | docker-compose.yml | done | @software-architect | @developer | @qa-tester | done | done | approved |
 | INFRA-01.3 | .dockerignore | done | @software-architect | — | — | done | — | — |
 | RF-01.11 | RedisStore (almacenamiento sesiones Redis) | done | — | @developer | — | — | done | — |
+| RF-04 | Mecanismos de Entrega de Mensajes Entrantes | done | — | @developer | @qa-tester | — | done | approved |
+| RF-04.1 | IncomingMessageHub (RingBuffer + handlers) | done | — | @developer | @qa-tester | — | done | approved |
+| RF-04.2 | Polling REST API (GET /api/messages) | done | — | @developer | @qa-tester | — | done | approved |
+| RF-04.3 | SSE Transport (GET /api/messages/stream) | done | — | @developer | @qa-tester | — | done | approved |
 
 ---
 

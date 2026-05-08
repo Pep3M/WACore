@@ -21,6 +21,7 @@ const testConfig: EnvConfig = {
   webhookSecret: 'int-test-secret',
   connectOnStartup: false,
   qrTimeout: 60000,
+  pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
   nodeEnv: 'test',
 };
 

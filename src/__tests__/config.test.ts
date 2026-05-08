@@ -71,6 +71,41 @@ describe('loadConfig', () => {
     expect(loadConfig().connectOnStartup).toBe(false);
   });
 
+  it('loads pollingEnabled default as false', () => {
+    delete Bun.env.POLLING_ENABLED;
+    expect(loadConfig().pollingEnabled).toBe(false);
+  });
+
+  it('loads sseEnabled default as true', () => {
+    delete Bun.env.SSE_ENABLED;
+    expect(loadConfig().sseEnabled).toBe(true);
+  });
+
+  it('loads messageBufferSize default', () => {
+    delete Bun.env.MESSAGE_BUFFER_SIZE;
+    expect(loadConfig().messageBufferSize).toBe(1000);
+  });
+
+  it('loads messageBufferTtlMs default', () => {
+    delete Bun.env.MESSAGE_BUFFER_TTL_MS;
+    expect(loadConfig().messageBufferTtlMs).toBe(300000);
+  });
+
+  it('loads sseHeartbeatMs default', () => {
+    delete Bun.env.SSE_HEARTBEAT_MS;
+    expect(loadConfig().sseHeartbeatMs).toBe(30000);
+  });
+
+  it('parses pollingEnabled from env', () => {
+    Bun.env.POLLING_ENABLED = 'true';
+    expect(loadConfig().pollingEnabled).toBe(true);
+  });
+
+  it('parses sseEnabled from env', () => {
+    Bun.env.SSE_ENABLED = 'true';
+    expect(loadConfig().sseEnabled).toBe(true);
+  });
+
   it('throws when WA_INSTANCE_NAME is missing', () => {
     delete Bun.env.WA_INSTANCE_NAME;
     expect(() => loadConfig()).toThrow('WA_INSTANCE_NAME es requerida');

@@ -7,7 +7,9 @@ const mockConfig = {
   instanceName: 'test', healthPort: 9877, apiPort: 9878, logLevel: 'error' as const,
   sessionStore: 'file' as const, sessionDir: '/tmp', webhookEvents: ['message', 'connection'],
   webhookRetryCount: 1, webhookRetryDelay: 10, webhookUrl: 'http://localhost:18999/webhook',
-  webhookSecret: 'test-secret', connectOnStartup: false, qrTimeout: 60000, nodeEnv: 'test',
+  webhookSecret: 'test-secret', connectOnStartup: false, qrTimeout: 60000,
+  pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
+  nodeEnv: 'test',
 };
 
 const disabledConfig = { ...mockConfig, webhookUrl: undefined };

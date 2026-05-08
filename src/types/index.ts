@@ -19,6 +19,11 @@ export interface EnvConfig {
   connectOnStartup: boolean;
   qrTimeout: number;
   nodeEnv: string;
+  pollingEnabled: boolean;
+  sseEnabled: boolean;
+  messageBufferSize: number;
+  messageBufferTtlMs: number;
+  sseHeartbeatMs: number;
 }
 
 // ─── Eventos del bus interno ──────────────────────────────────
@@ -217,4 +222,19 @@ export interface CommandRegistry {
   getAll(): Command[];
   start(): void;
   stop(): void;
+}
+
+// ─── Incoming Message Hub ──────────────────────────────────────
+
+export type MessageHandler = (msg: NormalizedMessage) => void | Promise<void>;
+
+export interface MessageBufferConfig {
+  maxSize: number;
+  ttlMs: number;
+}
+
+export interface PollMessagesResponse {
+  messages: NormalizedMessage[];
+  cursor: string | null;
+  hasMore: boolean;
 }

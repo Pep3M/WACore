@@ -1,5 +1,7 @@
 import type { Logger } from '../utils/logger';
-import type { EnvConfig, SendMessageRequest, SendMediaRequest, ApiResponse } from '../types';
+import type { EnvConfig, SendMessageRequest, SendMediaRequest, ApiResponse, PollMessagesResponse } from '../types';
+import type { IncomingMessageHub } from '../core/incoming-message-hub';
+import type { SSETransport } from './sse-transport';
 
 export interface RestApi {
   start(): void;
@@ -15,6 +17,8 @@ export function createRestApi(
   getConnectionStatus: () => string,
   getQr: () => string | null,
   logout: () => Promise<void>,
+  incomingHub?: IncomingMessageHub,
+  sseTransport?: SSETransport,
 ): RestApi {
   if (!config.apiKey) {
     return {
@@ -90,6 +94,22 @@ export function createRestApi(
     }
   }
 
+  function handleGetMessages(req: Request): Response {
+    if (!config.pollingEnabled || !incomingHub) {
+      return jsonResponse({ success: false, error: 'Polling not enabled' }, 404);
+    }
+    const url = new URL(req.url);
+    const since = url.searchParams.get('since') || undefined;
+    const limitParam = url.searchParams.get('limit');
+    let limit = 50;
+    if (limitParam) {
+      const parsed = parseInt(limitParam, 10);
+      if (!isNaN(parsed) && parsed > 0) limit = Math.min(parsed, 200);
+    }
+    const result: PollMessagesResponse = incomingHub.getRecentMessages(since, limit);
+    return jsonResponse({ success: true, data: result });
+  }
+
   return {
     start() {
       server = Bun.serve({
@@ -107,6 +127,13 @@ export function createRestApi(
           if (method === 'GET' && url.pathname === '/api/status') return handleGetStatus();
           if (method === 'GET' && url.pathname === '/api/qr') return handleGetQr();
           if (method === 'DELETE' && url.pathname === '/api/session') return handleDeleteSession();
+          if (method === 'GET' && url.pathname === '/api/messages') return handleGetMessages(req);
+          if (method === 'GET' && url.pathname === '/api/messages/stream') {
+            if (!sseTransport) {
+              return jsonResponse({ success: false, error: 'SSE not enabled' }, 404);
+            }
+            return sseTransport.handleConnection(req);
+          }
 
           return jsonResponse({ success: false, error: 'Not Found' }, 404);
         },

@@ -5,6 +5,8 @@ import { createMessageRouter } from './core/message-router';
 import { createHealthMonitor } from './core/health';
 import { createWebhookDispatcher } from './transport/webhook-dispatcher';
 import { createRestApi } from './transport/rest-api';
+import { createSSETransport } from './transport/sse-transport';
+import { createIncomingMessageHub } from './core/incoming-message-hub';
 import { createSessionStore } from './storage/session-store';
 import { createAuthProvider } from './baileys/auth';
 import { createBaileysClient } from './baileys/client';
@@ -22,6 +24,14 @@ async function main(): Promise<void> {
   const healthMonitor = createHealthMonitor(config.healthPort, logger, config.instanceName);
   const messageRouter = createMessageRouter(eventBus, logger);
   const webhookDispatcher = createWebhookDispatcher(eventBus, config, logger);
+  const incomingHub = createIncomingMessageHub(eventBus, logger, {
+    maxSize: config.messageBufferSize,
+    ttlMs: config.messageBufferTtlMs,
+  });
+  let sseTransport: ReturnType<typeof createSSETransport> | undefined;
+  if (config.sseEnabled) {
+    sseTransport = createSSETransport(incomingHub, logger, config.sseHeartbeatMs);
+  }
   const restApi = createRestApi(
     config.apiPort,
     config,
@@ -31,6 +41,8 @@ async function main(): Promise<void> {
     () => client.getConnectionStatus(),
     () => client.getQr(),
     () => client.logout(),
+    incomingHub,
+    sseTransport,
   );
 
   // ─── Bridge: connection updates → health monitor ─────────────
@@ -78,6 +90,7 @@ async function main(): Promise<void> {
   // ─── Start subsystems ───────────────────────────────────────
   healthMonitor.start();
   messageRouter.start();
+  incomingHub.start();
   webhookDispatcher.start();
   restApi.start();
 
@@ -92,6 +105,8 @@ async function main(): Promise<void> {
     await client.stop();
     webhookDispatcher.stop();
     messageRouter.stop();
+    incomingHub.stop();
+    sseTransport?.stop();
     restApi.stop();
     healthMonitor.stop();
     process.exit(0);
