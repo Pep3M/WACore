@@ -33,7 +33,8 @@ describe('AuthProvider', () => {
     const store = createMockStore(false);
     const provider = await createAuthProvider(store, logger);
     expect(provider.state.creds).toEqual({});
-    expect(provider.state.keys).toEqual({});
+    expect(typeof provider.state.keys.get).toBe('function');
+    expect(typeof provider.state.keys.set).toBe('function');
   });
 
   it('debounces saveCreds calls within same microtask', async () => {

@@ -286,7 +286,8 @@ describe('Baileys Integration - Client + Auth + Session Store', () => {
 
     expect(store.load).toHaveBeenCalled();
     expect(authProvider.state.creds).toEqual({ registrationId: 42 });
-    expect(authProvider.state.keys).toEqual({ preKeys: [1, 2, 3] });
+    const allKeys = await authProvider.state.keys.get('', []);
+    expect(allKeys).toEqual({ preKeys: [1, 2, 3] });
   });
 
   it('creates empty state when no session exists', async () => {
@@ -295,7 +296,8 @@ describe('Baileys Integration - Client + Auth + Session Store', () => {
     const authProvider = await createAuthProvider(store, logger);
 
     expect(authProvider.state.creds).toEqual({});
-    expect(authProvider.state.keys).toEqual({});
+    const allKeys = await authProvider.state.keys.get('', []);
+    expect(allKeys).toEqual({});
   });
 
   it('saves creds to store on demand', async () => {

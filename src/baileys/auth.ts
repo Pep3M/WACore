@@ -1,23 +1,23 @@
 import type { Logger } from '../utils/logger';
 import type { SessionStore } from '../storage/session-store';
 
-export interface BaileysAuthState {
+export interface AuthState {
   creds: Record<string, unknown>;
-  keys: Record<string, unknown>;
-  get: (type: string, ids: string[]) => Promise<Record<string, unknown>>;
-  set: (data: Record<string, unknown>) => Promise<void>;
-  save: () => Promise<void>;
+  keys: {
+    get: (type: string, ids: string[]) => Promise<Record<string, unknown>>;
+    set: (data: Record<string, unknown>) => Promise<void>;
+  };
 }
 
 export interface AuthProvider {
-  state: BaileysAuthState;
+  state: AuthState & { save: () => Promise<void> };
   saveCreds: () => Promise<void>;
 }
 
-async function buildState(sessionStore: SessionStore, logger: Logger): Promise<BaileysAuthState> {
+async function buildState(sessionStore: SessionStore, logger: Logger): Promise<AuthState & { save: () => Promise<void> }> {
   const existing = await sessionStore.load();
   const creds: Record<string, unknown> = (existing?.creds as Record<string, unknown>) ?? {};
-  const keys: Record<string, unknown> = (existing?.keys as Record<string, unknown>) ?? {};
+  const keyData: Record<string, unknown> = (existing?.keys as Record<string, unknown>) ?? {};
 
   if (existing) {
     logger.info('Auth state loaded from store');
@@ -30,40 +30,34 @@ async function buildState(sessionStore: SessionStore, logger: Logger): Promise<B
   function enqueueSave(): void {
     persistQueue = persistQueue.then(async () => {
       try {
-        await sessionStore.save(creds, keys);
+        await sessionStore.save(creds, keyData);
       } catch (err) {
         logger.error('Failed to save auth state', { error: String(err) });
       }
     });
   }
 
-  return {
-    creds,
-    keys,
-
+  const keys = {
     async get(type: string, ids: string[]): Promise<Record<string, unknown>> {
-      if (type === 'creds') return creds;
-      if (type === 'keys') {
-        if (ids.length === 0) return keys;
-        const result: Record<string, unknown> = {};
-        for (const id of ids) {
-          if (id in keys) result[id] = keys[id];
-        }
-        return result;
+      if (ids.length === 0) return keyData;
+      const result: Record<string, unknown> = {};
+      for (const id of ids) {
+        const key = `${type}-${id}`;
+        if (key in keyData) result[id] = keyData[key];
+        if (id in keyData) result[id] = keyData[id];
       }
-      return {};
+      return result;
     },
 
     async set(data: Record<string, unknown>): Promise<void> {
-      if (typeof data.creds === 'object' && data.creds !== null) {
-        Object.assign(creds, data.creds);
-      }
-      for (const [k, v] of Object.entries(data)) {
-        if (k !== 'creds') {
-          keys[k] = v;
-        }
-      }
+      Object.assign(keyData, data);
     },
+  };
+
+  return {
+    creds,
+
+    keys,
 
     async save(): Promise<void> {
       enqueueSave();
@@ -79,6 +73,11 @@ export async function createAuthProvider(
   const state = await buildState(sessionStore, logger);
   let saveScheduled = false;
 
+  async function persist(): Promise<void> {
+    const allKeys = await state.keys.get('', []);
+    await sessionStore.save(state.creds, allKeys);
+  }
+
   return {
     state,
 
@@ -90,7 +89,7 @@ export async function createAuthProvider(
       saveScheduled = false;
 
       try {
-        await sessionStore.save(state.creds, state.keys);
+        await persist();
       } catch (err) {
         logger.error('Failed to save auth state', { error: String(err) });
       }
