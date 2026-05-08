@@ -55,11 +55,21 @@
 | m-03 | HEALTH_PORT default 3000 vs 9877 | Diseño actualizado a 9877 |
 | m-04 | phoneNumber en health sin auth | `showPhoneNumber` flag, default false |
 
+## RedisStore implementado
+
+- **Feature:** RedisStore (sesiones vía ioredis)
+- **Fase:** implementing → done
+- **Dependencia:** ioredis 5.10.1 añadida
+- **Implementación:** Sesión almacenada como 2 claves Redis (`wacore:session:{instance}:creds` y `wacore:session:{instance}:keys`)
+- **Backup:** BGSAVE manual vía `backup()`, RDB/AOF para persistencia automática
+- **Tests:** 13 tests (98 total), todos pasando
+- **TypeScript:** 0 errores ✅
+
 ## Estado actual
 
 - **TypeScript:** 0 errores ✅
-- **Tests:** 85/85 pass (167 assertions, 13 archivos) ✅
-- **Cobertura:** 13/19 archivos fuente con tests directos (68%)
+- **Tests:** 98/98 pass (183 assertions, 14 archivos) ✅
+- **Cobertura:** 14/20 archivos fuente con tests directos (70%)
 - **Veredicto QA:** **APPROVED** ✅
 
 ## QA Final
@@ -72,16 +82,15 @@
 
 ### Resumen de sesión
 
-| Fase | Estado |
-|------|--------|
-| Diseño (@software-architect) | ✅ Completado |
-| Implementación (@developer) | ✅ 19 archivos, typecheck 0, tests 85/85 |
-| QA (@qa-tester) | ✅ APROBADO |
+| Feature | Fase | Estado |
+|---------|------|--------|
+| Core backend (RF-01+RF-02+RF-03+INFRA-01) | Diseño → Impl → QA | ✅ Completado |
+| RedisStore (sesiones persistentes) | Implementación directa | ✅ Completado (13 tests) |
 
 ## Próximos pasos
 
 Core backend completado. Próximas iteraciones:
-1. Implementar RedisStore
+1. ~~Implementar RedisStore~~ ✅
 2. HMAC real en webhook-dispatcher
 3. Tests de integración con Baileys real
 4. Feature: sistema de comandos (RF-02)

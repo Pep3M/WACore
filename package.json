@@ -14,7 +14,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "baileys": "^7.0.0-rc10"
+    "baileys": "^7.0.0-rc10",
+    "ioredis": "^5.10.1"
   }
-}
 }

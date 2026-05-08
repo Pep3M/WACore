@@ -26,6 +26,7 @@
 | INFRA-01.1 | Dockerfile multi-stage | done | @software-architect | @developer | @qa-tester | done | done | approved |
 | INFRA-01.2 | docker-compose.yml | done | @software-architect | @developer | @qa-tester | done | done | approved |
 | INFRA-01.3 | .dockerignore | done | @software-architect | — | — | done | — | — |
+| RF-01.11 | RedisStore (almacenamiento sesiones Redis) | done | — | @developer | — | — | done | — |
 
 ---
 
