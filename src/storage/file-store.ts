@@ -1,4 +1,5 @@
 import { mkdirSync, unlinkSync } from 'node:fs';
+import { BufferJSON } from 'baileys/lib/Utils/generics.js';
 import type { Logger } from '../utils/logger';
 import type { EnvConfig } from '../types';
 import type { SessionStore } from './session-store';
@@ -49,8 +50,10 @@ export class FileStore implements SessionStore {
         return null;
       }
 
-      const creds = await credsFile.json();
-      const keys = await keysFile.json();
+      const rawCreds = await credsFile.text();
+      const rawKeys = await keysFile.text();
+      const creds = JSON.parse(rawCreds, BufferJSON.reviver);
+      const keys = JSON.parse(rawKeys, BufferJSON.reviver);
 
       this.logger.info('Session loaded from file store');
       return { creds, keys };
@@ -64,8 +67,8 @@ export class FileStore implements SessionStore {
   async save(creds: unknown, keys: unknown): Promise<void> {
     await this.backup();
     try {
-      await Bun.write(this.credsPath(), JSON.stringify(creds, null, 2));
-      await Bun.write(this.keysPath(), JSON.stringify(keys, null, 2));
+      await Bun.write(this.credsPath(), JSON.stringify(creds, BufferJSON.replacer, 2));
+      await Bun.write(this.keysPath(), JSON.stringify(keys, BufferJSON.replacer, 2));
       this.logger.debug('Session saved');
     } catch (err) {
       this.logger.error('Failed to save session', { error: String(err) });

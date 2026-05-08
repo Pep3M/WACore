@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import { BufferJSON } from 'baileys/lib/Utils/generics.js';
 import type { Logger } from '../utils/logger';
 import type { EnvConfig } from '../types';
 import type { SessionStore } from './session-store';
@@ -53,8 +54,8 @@ export class RedisStore implements SessionStore {
         return null;
       }
 
-      const creds = JSON.parse(credsJson) as unknown;
-      const keys = JSON.parse(keysJson) as unknown;
+      const creds = JSON.parse(credsJson, BufferJSON.reviver) as unknown;
+      const keys = JSON.parse(keysJson, BufferJSON.reviver) as unknown;
       this.logger.info('Session loaded from Redis');
       return { creds, keys };
     } catch (err) {
@@ -65,8 +66,8 @@ export class RedisStore implements SessionStore {
 
   async save(creds: unknown, keys: unknown): Promise<void> {
     try {
-      const credsJson = JSON.stringify(creds);
-      const keysJson = JSON.stringify(keys);
+      const credsJson = JSON.stringify(creds, BufferJSON.replacer);
+      const keysJson = JSON.stringify(keys, BufferJSON.replacer);
       await this.redis.mset(this.credsKey(), credsJson, this.keysKey(), keysJson);
       this.logger.debug('Session saved to Redis');
     } catch (err) {
