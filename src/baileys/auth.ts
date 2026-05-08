@@ -1,0 +1,1 @@
+// Persistencia de autenticación WhatsApp
