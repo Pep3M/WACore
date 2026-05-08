@@ -31,9 +31,21 @@ export function createWebhookDispatcher(
     logger,
   );
 
-  function sign(body: string): string {
+  async function sign(body: string): Promise<string> {
     if (!config.webhookSecret) return '';
-    return body; // HMAC disabled in current version; will implement with Web Crypto API
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(config.webhookSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+    const hex = Array.from(new Uint8Array(signature))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return hex;
   }
 
   async function deliver(payload: WebhookPayload): Promise<void> {

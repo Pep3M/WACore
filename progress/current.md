@@ -33,6 +33,7 @@
 - **Fix:** FileStore.delete() ahora usa unlinkSync en vez de write('')
 - **Fix:** MessageRouter detecta tipos desconocidos y los ignora (corta recursión)
 - **Impl report:** progress/impl-core-backend.md creado
+- **HMAC real:** Web Crypto API (SHA-256) implementado en webhook-dispatcher
 
 ## QA Review results
 
@@ -91,6 +92,6 @@
 
 Core backend completado. Próximas iteraciones:
 1. ~~Implementar RedisStore~~ ✅
-2. HMAC real en webhook-dispatcher
+2. ~~HMAC real en webhook-dispatcher~~ ✅
 3. Tests de integración con Baileys real
 4. Feature: sistema de comandos (RF-02)
