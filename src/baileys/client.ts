@@ -76,7 +76,13 @@ export async function createBaileysClient(
         currentQr = qr;
         eventBus.emit('qr', { qr, timeout: config.qrTimeout });
         updateStatus('awaiting-qr');
-        logger.info('QR code generated');
+        logger.info('Escanea el QR con WhatsApp para conectar:');
+        try {
+          const qrcode = await import('qrcode-terminal');
+          qrcode.default.generate(qr, { small: true });
+        } catch {
+          process.stdout.write(qr + '\n');
+        }
       }
 
       if (connection === 'open') {
