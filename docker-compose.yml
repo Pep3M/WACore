@@ -48,8 +48,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: wacore-redis
-    ports:
-      - "6379:6379"
+    # ports:            # Solo descomentar si necesitas acceder a Redis desde el host
+    #   - "6379:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
