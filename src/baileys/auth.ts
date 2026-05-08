@@ -1,3 +1,4 @@
+import { initAuthCreds } from 'baileys/lib/Utils/auth-utils.js';
 import type { Logger } from '../utils/logger';
 import type { SessionStore } from '../storage/session-store';
 
@@ -16,13 +17,16 @@ export interface AuthProvider {
 
 async function buildState(sessionStore: SessionStore, logger: Logger): Promise<AuthState & { save: () => Promise<void> }> {
   const existing = await sessionStore.load();
-  const creds: Record<string, unknown> = (existing?.creds as Record<string, unknown>) ?? {};
+
+  const creds: Record<string, unknown> = existing
+    ? (existing.creds as Record<string, unknown>)
+    : (initAuthCreds() as unknown as Record<string, unknown>);
   const keyData: Record<string, unknown> = (existing?.keys as Record<string, unknown>) ?? {};
 
   if (existing) {
     logger.info('Auth state loaded from store');
   } else {
-    logger.info('No existing auth state, will generate new credentials');
+    logger.info('Generated fresh authentication credentials');
   }
 
   let persistQueue: Promise<void> = Promise.resolve();

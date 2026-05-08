@@ -290,12 +290,13 @@ describe('Baileys Integration - Client + Auth + Session Store', () => {
     expect(allKeys).toEqual({ preKeys: [1, 2, 3] });
   });
 
-  it('creates empty state when no session exists', async () => {
+  it('generates fresh creds when no session exists', async () => {
     const { createAuthProvider } = await import('../baileys/auth');
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
 
-    expect(authProvider.state.creds).toEqual({});
+    expect(authProvider.state.creds.registrationId).toBeDefined();
+    expect(authProvider.state.creds.noiseKey).toBeDefined();
     const allKeys = await authProvider.state.keys.get('', []);
     expect(allKeys).toEqual({});
   });

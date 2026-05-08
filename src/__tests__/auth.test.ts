@@ -29,10 +29,11 @@ describe('AuthProvider', () => {
     expect(store.load).toHaveBeenCalledTimes(1);
   });
 
-  it('creates empty state when no existing data', async () => {
+  it('generates fresh creds when no existing data', async () => {
     const store = createMockStore(false);
     const provider = await createAuthProvider(store, logger);
-    expect(provider.state.creds).toEqual({});
+    expect(provider.state.creds.registrationId).toBeDefined();
+    expect(provider.state.creds.noiseKey).toBeDefined();
     expect(typeof provider.state.keys.get).toBe('function');
     expect(typeof provider.state.keys.set).toBe('function');
   });
