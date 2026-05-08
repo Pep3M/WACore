@@ -3,7 +3,7 @@
 > **Feature:** RF-05 (RF-05.1, RF-05.2, RF-05.3)
 > **Fecha:** 2026-05-08
 > **Revisor:** @qa-tester
-> **Veredicto:** `CHANGES_REQUESTED`
+> **Veredicto:** `APPROVED`
 
 ---
 
@@ -188,22 +188,25 @@ La lógica de serialización en `PostgresStore.load()` es correcta:
 
 ---
 
-## 5. Veredicto final
+## 5. Fixes aplicados
+
+| ID | Hallazgo | Fix | Commit |
+|----|----------|-----|--------|
+| C-01 | `drizzle-orm` y `postgres` faltaban en `dependencies` | `bun add drizzle-orm postgres` ejecutado | `d5a0753` |
+
+## 6. Verificación post-fix
+
+- ✅ `bun test` → 199/199 pass (0 fail, 388 expect calls)
+- ✅ `tsc --noEmit` → 0 errores
+- ✅ `package.json` contiene `drizzle-orm@^0.45.2` y `postgres@^3.4.9` en `dependencies`
+- ✅ `bun.lock` actualizado con las nuevas dependencias
+
+## 7. Veredicto final
 
 ```
-╔══════════════════════════════════════════════╗
-║              CHANGES_REQUESTED               ║
-╚══════════════════════════════════════════════╝
+╔══════════════════════════╗
+║         APPROVED         ║
+╚══════════════════════════╝
 ```
 
-**Condición para aprobar:**
-
-1. **CRITICAL**: Añadir `drizzle-orm` y `postgres` a `dependencies` en `package.json` ejecutando `bun add drizzle-orm postgres`.
-
-Una vez corregido, ejecutar:
-- `bun test` → 199/199 pass
-- `tsc --noEmit` → 0 errores
-- Verificar que `bun.lock` contiene las nuevas dependencias
-
-**Razón del veredicto:**
-La implementación es de alta calidad: lógica correcta, tests completos, manejo de errores sólido, y sin regresiones. Sin embargo, el error en `package.json` es un **show-stopper para producción**: el contenedor Docker no tendrá las dependencias runtime necesarias, causando un crash al arrancar con `SESSION_STORE=postgres`. Una vez añadidas las dependencias faltantes, el feature estará listo para aprobarse.
+Todos los hallazgos corregidos, sin regresiones, feature listo para producción.
