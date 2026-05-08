@@ -1,95 +1,266 @@
-# WACore REST API
+# WACore
 
-## Base URL
-
-```
-http://<host>:<API_PORT>/
-```
-
-`API_PORT` defaults to `9878`.
-
-## Authentication
-
-Todas las peticiones requieren el header `Authorization: Bearer <API_KEY>`.
-
-```
-Authorization: Bearer mi-api-key-segura
-```
-
-Si `API_KEY` no está definida en el entorno, el servidor REST se deshabilita.
+WACore es un backend para WhatsApp basado en [Baileys](https://github.com/whiskeysockets/baileys) (WebSocket, TypeScript). Permite conectar una instancia de WhatsApp, recibir mensajes entrantes en tiempo real y enviar mensajes mediante una API REST.
 
 ---
 
-## Endpoints
+## Índice
+
+- [Quick start](#quick-start)
+- [Uso con Docker](#uso-con-docker)
+- [Variables de entorno](#variables-de-entorno)
+- [Conexión a WhatsApp](#conexión-a-whatsapp)
+- [API REST](#api-rest)
+  - [Enviar mensaje de texto](#post-apisend--enviar-mensaje-de-texto)
+  - [Enviar multimedia](#post-apisend-media--enviar-multimedia)
+  - [Estado de conexión](#get-apistatus--estado-de-conexión)
+  - [Obtener QR](#get-apiqr--obtener-qr-en-texto)
+  - [Cerrar sesión](#delete-apisession--cerrar-sesión)
+  - [Polling de mensajes entrantes](#get-apimessages--polling-de-mensajes-entrantes)
+  - [SSE streaming](#get-apimessagesstream--sse-server-sent-events)
+- [Recepción de mensajes](#recepción-de-mensajes)
+  - [SSE (tiempo real)](#sse-tiempo-real)
+  - [Webhook](#webhook)
+  - [Polling](#polling)
+- [Persistencia de sesión](#persistencia-de-sesión)
+- [Ejemplos de uso](#ejemplos-de-uso)
+  - [Echo: responder con el mismo mensaje](#echo-responder-con-el-mismo-mensaje)
+  - [Guardar contacto automáticamente](#guardar-contacto-automáticamente)
+  - [Enviar mensaje desde otro servicio](#enviar-mensaje-desde-otro-servicio)
+
+---
+
+## Quick start
+
+```bash
+# 1. Clonar e instalar dependencias
+git clone <repo> && cd WACore
+bun install
+
+# 2. Configurar (mínimo: API_KEY)
+cp .env.example .env
+# Editar .env y poner API_KEY=mi-clave-segura
+
+# 3. Iniciar
+bun start
+```
+
+En la terminal verás un código QR. Escanéalo con WhatsApp → **Ajustes > Dispositivos vinculados > Vincular un dispositivo**.
+
+Una vez conectado, la API REST está disponible en `http://localhost:9878`.
+
+---
+
+## Uso con Docker
+
+### Desde GitHub Container Registry
+
+```bash
+docker pull ghcr.io/anomalyco/WACore:latest
+
+docker run -d \
+  --name wacore \
+  -p 9877:9877 \
+  -p 9878:9878 \
+  -e API_KEY=mi-clave-segura \
+  -e WA_INSTANCE_NAME=bot-prod \
+  -v wa_sessions:/data/sessions \
+  ghcr.io/anomalyco/WACore:latest
+```
+
+### Con docker-compose (recomendado)
+
+```yaml
+# docker-compose.yml
+services:
+  wacore:
+    image: ghcr.io/anomalyco/WACore:latest
+    container_name: wacore
+    ports:
+      - "9877:9877"   # Health check
+      - "9878:9878"   # REST API
+    volumes:
+      - wa_sessions:/data/sessions
+    environment:
+      - WA_INSTANCE_NAME=bot-prod
+      - API_KEY=mi-clave-segura
+      - SESSION_STORE=postgres
+      - DATABASE_URL=postgres://wacore:wacore@postgres:5432/wacore
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wacore
+      POSTGRES_PASSWORD: wacore
+      POSTGRES_DB: wacore
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wacore"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  wa_sessions:
+  pg_data:
+```
+
+> **Nota**: Las migraciones de PostgreSQL se ejecutan automáticamente al arrancar. No necesitas correr nada manualmente.
+
+---
+
+## Variables de entorno
+
+### Instancia
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `WA_INSTANCE_NAME` | `bot-dev` | Nombre único de la instancia. Determina la clave en DB o archivo de sesión. |
+| `CONNECT_ON_STARTUP` | `true` | Conectar automáticamente al iniciar. Si `false`, espera a llamar a la API. |
+| `QR_TIMEOUT` | `60000` | Tiempo máximo (ms) para escanear el QR antes de regenerarlo. |
+
+### API REST
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `API_PORT` | `9878` | Puerto del servidor REST. |
+| `API_KEY` | — | Token para autenticar peticiones. **Si se omite, la API se deshabilita.** |
+| `HEALTH_PORT` | `9877` | Puerto del health check (GET /health). |
+
+### Logging
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `LOG_LEVEL` | `info` | Nivel de log: `debug`, `info`, `warn`, `error`. |
+
+### Sesión (session store)
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `SESSION_STORE` | `file` | Backend de persistencia: `file`, `redis` o `postgres`. |
+| `SESSION_DIR` | `/data/sessions` | Directorio para `file` store. |
+| `DATABASE_URL` | — | URL de conexión para PostgreSQL (ej: `postgres://user:pass@host:5432/db`). Requerido si `SESSION_STORE=postgres`. |
+| `REDIS_URL` | `redis://localhost:6379` | URL de conexión para Redis (requerido si `SESSION_STORE=redis`). |
+
+### Mensajes entrantes
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `SSE_ENABLED` | `true` | Habilita `GET /api/messages/stream` (SSE en tiempo real). |
+| `POLLING_ENABLED` | `false` | Habilita `GET /api/messages` (polling REST). |
+| `MESSAGE_BUFFER_SIZE` | `1000` | Máximo de mensajes en buffer para polling/SSE. |
+| `MESSAGE_BUFFER_TTL_MS` | `300000` | Tiempo de vida (ms) de mensajes en buffer (5 min). |
+| `SSE_HEARTBEAT_MS` | `30000` | Intervalo (ms) del heartbeat SSE. |
+
+### Webhook
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `WEBHOOK_URL` | — | URL que recibe los mensajes via HTTP POST. Si se omite, webhook deshabilitado. |
+| `WEBHOOK_SECRET` | — | Clave HMAC-SHA256 para firmar los payloads (header `X-WACore-Signature`). |
+| `WEBHOOK_EVENTS` | `message` | Eventos a enviar: `message`, `connection`, `qr` (separados por coma). |
+| `WEBHOOK_RETRY_COUNT` | `3` | Número de reintentos ante fallo de entrega. |
+| `WEBHOOK_RETRY_DELAY` | `5000` | Espera (ms) entre reintentos. |
+
+---
+
+## Conexión a WhatsApp
+
+### Primera conexión
+
+Al iniciar WACore, si no hay una sesión guardada, se muestra un código QR en la terminal:
+
+```
+┌──────────────────────────────┐
+│  ██ ██████ ██  ██  ██ ██████ │
+│  ██  ██  ████ ██████ ██  ██ │
+│  ████ ██████ ██████ ████████ │
+│  ██████ ██████  ██  ██  ████ │
+│  ██  ██████ ██████ ██████  ██ │
+└──────────────────────────────┘
+Escanea el QR con WhatsApp para conectar
+```
+
+**En WhatsApp**: Abre → Ajustes (⚙️) → Dispositivos vinculados → Vincular un dispositivo → Escanea el QR.
+
+### Reconexión automática
+
+WACore guarda la sesión automáticamente. Al reiniciar, si hay una sesión previa válida:
+
+- **Con `SESSION_STORE=file`**: las credenciales persisten en `SESSION_DIR` (por defecto `/data/sessions/`).
+- **Con `SESSION_STORE=redis`**: persisten en Redis.
+- **Con `SESSION_STORE=postgres`**: persisten en PostgreSQL (tabla `wacore_sessions`).
+
+No es necesario escanear el QR de nuevo a menos que la sesión expire o se cierre explícitamente con `DELETE /api/session`.
+
+### Obtener QR via API
+
+Si no se usó `CONNECT_ON_STARTUP=true` o se perdió la sesión:
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/qr
+```
+
+---
+
+## API REST
+
+Todas las peticiones requieren el header:
+
+```
+Authorization: Bearer <API_KEY>
+```
 
 ### `POST /api/send` — Enviar mensaje de texto
 
-```json
-{
-  "to": "5215512345678",
-  "text": "Hola, ¿cómo estás?"
-}
+```bash
+curl -X POST http://localhost:9878/api/send \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"to":"5215512345678","text":"Hola, ¿cómo estás?"}'
 ```
 
 | Campo | Tipo | Obligatorio | Descripción |
-|-------|------|-------------|-------------|
-| `to` | string | sí | Número o JID de WhatsApp |
-| `text` | string | sí | Contenido del mensaje |
+|---|---|---|---|
+| `to` | string | sí | Número o JID de WhatsApp (con o sin `@s.whatsapp.net`). |
+| `text` | string | sí | Contenido del mensaje. |
 
-**Response `200`:**
-
+**Response:**
 ```json
 {
   "success": true,
-  "messageId": "3EB0C25E6A..."
+  "data": { "id": "3EB0C25E6A..." }
 }
 ```
-
----
 
 ### `POST /api/send-media` — Enviar multimedia
 
-```json
-{
-  "to": "5215512345678",
-  "type": "image",
-  "url": "https://ejemplo.com/foto.jpg",
-  "caption": "Mira esto",
-  "mimetype": "image/jpeg",
-  "filename": "foto.jpg"
-}
+```bash
+curl -X POST http://localhost:9878/api/send-media \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"to":"5215512345678","type":"image","url":"https://ejemplo.com/foto.jpg","caption":"Mira esto"}'
 ```
 
 | Campo | Tipo | Obligatorio | Descripción |
-|-------|------|-------------|-------------|
-| `to` | string | sí | Número o JID de WhatsApp |
-| `type` | string | sí | `image`, `video`, `document` o `audio` |
-| `url` | string | sí | URL pública del archivo |
-| `caption` | string | no | Texto que acompaña al archivo |
-| `mimetype` | string | no | Tipo MIME (detectado automáticamente si se omite) |
-| `filename` | string | no | Nombre del archivo (solo `document`) |
-
-**Response `200`:**
-
-```json
-{
-  "success": true,
-  "messageId": "3EB0C25E6A..."
-}
-```
-
-**Response `400`:**
-
-```json
-{
-  "success": false,
-  "error": "Unsupported media type: gif"
-}
-```
-
----
+|---|---|---|---|
+| `to` | string | sí | Número o JID de WhatsApp. |
+| `type` | string | sí | `image`, `video`, `document` o `audio`. |
+| `url` | string | sí | URL pública del archivo. |
+| `caption` | string | no | Texto que acompaña al archivo. |
+| `mimetype` | string | no | Tipo MIME (detectado automáticamente si se omite). |
+| `filename` | string | no | Nombre del archivo (solo para `document`). |
 
 ### `GET /api/status` — Estado de conexión
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/status
+```
 
 ```json
 {
@@ -104,52 +275,51 @@ Si `API_KEY` no está definida en el entorno, el servidor REST se deshabilita.
 }
 ```
 
-Posibles valores de `status`: `connected`, `connecting`, `disconnected`, `qr`.
-
----
+Posibles valores de `status`: `connected`, `connecting`, `disconnected`, `awaiting-qr`, `logged-out`, `failed`.
 
 ### `GET /api/qr` — Obtener QR en texto
 
+```bash
+curl -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/qr
+```
+
 ```json
 {
   "success": true,
-  "data": {
-    "qr": "1@abc123def456..."
-  }
+  "data": { "qr": "1@abc123def456..." }
 }
 ```
 
-`qr` es `null` si no hay un QR activo.
-
----
+> Retorna `404` si ya hay una conexión activa (no hay QR disponible).
 
 ### `DELETE /api/session` — Cerrar sesión
 
+```bash
+curl -X DELETE -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/session
+```
+
 ```json
 {
   "success": true,
-  "message": "Session closed"
+  "data": { "loggedOut": true }
 }
 ```
 
-Elimina las credenciales almacenadas y desconecta WhatsApp.
-
----
+Elimina las credenciales almacenadas y desconecta WhatsApp. Tras esto, WACore quedará desconectado. Para reconectar se requerirá escanear un nuevo QR.
 
 ### `GET /api/messages` — Polling de mensajes entrantes
 
-> Requiere `POLLING_ENABLED=true` (deshabilitado por defecto).
+> Requiere `POLLING_ENABLED=true`.
 
-```
-GET /api/messages?since=2025-05-08T12:00:00.000Z&limit=50
+```bash
+curl -H "Authorization: Bearer $API_KEY" \
+  "http://localhost:9878/api/messages?since=2025-05-08T12:00:00.000Z&limit=10"
 ```
 
 | Query param | Tipo | Default | Descripción |
 |---|---|---|---|
-| `since` | string (ISO 8601) | — | Solo mensajes posteriores a este timestamp |
-| `limit` | number | `50` | Máximo de mensajes a devolver (máx. 200) |
-
-**Response `200`:**
+| `since` | string (ISO 8601) | — | Solo mensajes posteriores a este timestamp. Usa el `cursor` de la respuesta anterior para paginar. |
+| `limit` | number | `50` | Máximo de mensajes (máx. 200). |
 
 ```json
 {
@@ -165,80 +335,340 @@ GET /api/messages?since=2025-05-08T12:00:00.000Z&limit=50
         "groupId": null,
         "timestamp": 1747000000,
         "type": "text",
-        "body": "Hola",
+        "body": "Hola, cómo estás?",
         "quotedMessage": null,
         "media": null
       }
     ],
-    "cursor": "2025-05-08T12:00:00.000Z",
+    "cursor": "2025-05-08T12:00:05.000Z",
     "hasMore": false
   }
 }
 ```
 
----
-
 ### `GET /api/messages/stream` — SSE (Server-Sent Events)
 
-> Habilitado por defecto. Deshabilitar con `SSE_ENABLED=false`.
+> Habilitado por defecto (`SSE_ENABLED=true`).
 
-```
-GET /api/messages/stream?types=text,image&phone=5215512345678&includeGroups=true
+```bash
+curl -N -H "Authorization: Bearer $API_KEY" \
+  "http://localhost:9878/api/messages/stream?types=text,image&includeGroups=true"
 ```
 
 | Query param | Tipo | Default | Descripción |
 |---|---|---|---|
-| `types` | string (csv) | todos | Filtrar por tipo de mensaje: `text`,`image`,`video`,`document`,`audio`,`reaction` |
-| `phone` | string | — | Filtrar por remitente (número sin sufijo) |
-| `includeGroups` | boolean | `true` | Incluir mensajes de grupos |
+| `types` | string (csv) | todos | Filtrar por tipo: `text`, `image`, `video`, `document`, `audio`, `reaction`. |
+| `phone` | string | — | Filtrar por remitente (número sin sufijo `@s.whatsapp.net`). |
+| `includeGroups` | boolean | `true` | Incluir mensajes de grupos. |
 
-El cliente recibe eventos SSE en tiempo real:
+El stream envía eventos en este formato:
 
 ```
 event: message.text
-data: {"id":"3EB0C25E6A...","from":"5215512345678@s.whatsapp.net","phone":"5215512345678",...}
+id: 3EB0C25E6A...
+data: {"id":"3EB0C25E6A...","from":"5215512345678@s.whatsapp.net","phone":"5215512345678","type":"text","body":"Hola",...}
 
 event: ping
 data: {}
 ```
 
-Heartbeat cada 30s (evento `ping`) para mantener la conexión viva.
+Eventos disponibles:
+- `message.text`, `message.image`, `message.video`, `message.document`, `message.audio`, `message.reaction`
+- `ping` — heartbeat cada 30s para mantener la conexión viva
 
 ---
 
-## Variables de entorno relevantes
+## Recepción de mensajes
 
-| Variable | Default | Descripción |
-|----------|---------|-------------|
-| `API_PORT` | `9878` | Puerto del servidor REST |
-| `API_KEY` | — | Token para autenticación (si se omite, la API se deshabilita) |
-| `POLLING_ENABLED` | `false` | Habilita `GET /api/messages` |
-| `SSE_ENABLED` | `true` | Habilita `GET /api/messages/stream` |
-| `MESSAGE_BUFFER_SIZE` | `1000` | Tamaño del buffer circular de mensajes |
-| `MESSAGE_BUFFER_TTL_MS` | `300000` | TTL de mensajes en buffer (ms) |
-| `SSE_HEARTBEAT_MS` | `30000` | Intervalo heartbeat SSE (ms) |
+WACore ofrece tres mecanismos para recibir mensajes entrantes de WhatsApp. Puedes usar uno o varios simultáneamente.
 
-## Ejemplo con curl
+### SSE (tiempo real)
+
+Recomendado para servicios que necesitan recibir mensajes al instante. El servidor empuja los eventos al cliente a través de una conexión HTTP larga.
+
+```javascript
+// Ejemplo con JavaScript (Node.js, Bun, navegador)
+const events = new EventSource(
+  'http://localhost:9878/api/messages/stream?types=text,image',
+  { headers: { Authorization: 'Bearer mi-api-key' } }
+);
+
+events.addEventListener('message.text', (event) => {
+  const msg = JSON.parse(event.data);
+  console.log(`${msg.pushName}: ${msg.body}`);
+
+  // Responder automáticamente
+  if (msg.body === '!ping') {
+    fetch('http://localhost:9878/api/send', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer mi-api-key',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ to: msg.from, text: 'Pong!' }),
+    });
+  }
+});
+```
+
+**Ventajas:**
+- Tiempo real, sin polling.
+- Bajo overhead (una conexión TCP persistente).
+- Filtros del lado del servidor (`types`, `phone`, `includeGroups`).
+
+### Webhook
+
+WACore hace un POST HTTP a una URL configurada por cada mensaje entrante. Ideal para integrar con servicios externos (n8n, Zapier, Make, tu propia API).
+
+Configuración mínima:
+
+```env
+WEBHOOK_URL=https://mi-servicio.com/webhook/whatsapp
+WEBHOOK_SECRET=mi-clave-hmac
+WEBHOOK_EVENTS=message,connection,qr
+```
+
+Payload que recibe el webhook:
+
+```json
+{
+  "event": "message",
+  "instanceId": "bot-prod",
+  "timestamp": "2025-05-08T12:00:00.000Z",
+  "data": {
+    "id": "3EB0C25E6A...",
+    "from": "5215512345678@s.whatsapp.net",
+    "phone": "5215512345678",
+    "pushName": "Juan",
+    "type": "text",
+    "body": "Hola",
+    "isGroup": false,
+    ...
+  }
+}
+```
+
+Headers adicionales:
+- `X-WACore-Event: message`
+- `X-WACore-Instance: bot-prod`
+- `X-WACore-Timestamp: 2025-05-08T12:00:00.000Z`
+- `X-WACore-Signature: <hmac-sha256>` (si se configuró `WEBHOOK_SECRET`)
+
+> Incluye circuit breaker: tras fallos consecutivos, deja de intentar y se restablece automáticamente tras un tiempo de espera.
+
+### Polling
+
+Para sistemas simples que prefieren consultar mensajes bajo demanda.
 
 ```bash
-API=http://localhost:9878
-KEY=mi-api-key-segura
+# Cada N segundos, preguntar por mensajes nuevos
+SINCE="2025-05-08T12:00:00Z"
+while true; do
+  RESP=$(curl -s -H "Authorization: Bearer $API_KEY" \
+    "http://localhost:9878/api/messages?since=$SINCE&limit=10")
+  echo "$RESP" | jq -c '.data.messages[] | {from: .phone, body: .body}'
+  SINCE=$(echo "$RESP" | jq -r '.data.cursor // $SINCE')
+  sleep 3
+done
+```
+
+Ver la sección [`GET /api/messages`](#get-apimessages--polling-de-mensajes-entrantes) para detalle del formato.
+
+---
+
+## Persistencia de sesión
+
+WACore guarda las credenciales de autenticación de WhatsApp para no requerir escanear el QR en cada reinicio. Soporta tres backends:
+
+### File (default)
+
+```env
+SESSION_STORE=file
+SESSION_DIR=/data/sessions
+```
+
+Guarda `creds.json` y `keys.json` en el directorio configurado. Incluye backups rotativos (`creds.json.bak.1`, `.bak.2`, `.bak.3`).
+
+> ⚠️ En Docker, asegúrate de montar un volumen persistente en `SESSION_DIR` o perderás la sesión al recrear el contenedor.
+
+### Redis
+
+```env
+SESSION_STORE=redis
+REDIS_URL=redis://redis:6379
+```
+
+Las claves se almacenan como:
+- `wacore:session:{instance}:creds`
+- `wacore:session:{instance}:keys`
+
+### PostgreSQL
+
+```env
+SESSION_STORE=postgres
+DATABASE_URL=postgres://user:pass@host:5432/db
+```
+
+Las migraciones se ejecutan **automáticamente** al arrancar. No necesitas correr nada manual.
+
+Esquema de la tabla (`wacore_sessions`):
+
+```sql
+CREATE TABLE IF NOT EXISTS wacore_sessions (
+    instance_name TEXT PRIMARY KEY,
+    creds         JSONB NOT NULL,
+    keys          JSONB NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+> Múltiples instancias de WACore (distinto `WA_INSTANCE_NAME`) pueden compartir la misma base de datos PostgreSQL sin conflictos.
+
+---
+
+## Ejemplos de uso
+
+### Echo: responder con el mismo mensaje
+
+Usando SSE + REST API desde un script externo:
+
+```javascript
+// echo.js — recibe mensajes y responde con eco
+const API = 'http://localhost:9878';
+const KEY = 'mi-api-key';
+
+async function main() {
+  const response = await fetch(`${API}/api/messages/stream?types=text`, {
+    headers: { Authorization: `Bearer ${KEY}` },
+  });
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('data: ') && !line.includes('ping')) {
+        const msg = JSON.parse(line.slice(6));
+
+        // Responder con el mismo mensaje (eco)
+        await fetch(`${API}/api/send`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: msg.from,
+            text: `Echo: ${msg.body || '(sin texto)'}`,
+          }),
+        });
+
+        console.log(`Respondido a ${msg.pushName}: ${msg.body}`);
+      }
+    }
+  }
+}
+
+main().catch(console.error);
+```
+
+```bash
+bun run echo.js
+```
+
+### Guardar contacto automáticamente
+
+Cuando alguien escribe por primera vez, se registra su número:
+
+```javascript
+// contacts.js
+const API = 'http://localhost:9878';
+const KEY = 'mi-api-key';
+const seen = new Set();
+
+async function main() {
+  const response = await fetch(`${API}/api/messages/stream?types=text,image`, {
+    headers: { Authorization: `Bearer ${KEY}` },
+  });
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('data: ') && !line.includes('ping')) {
+        const msg = JSON.parse(line.slice(6));
+
+        if (!seen.has(msg.phone) && !msg.isGroup) {
+          seen.add(msg.phone);
+          console.log(`Nuevo contacto: ${msg.pushName} (${msg.phone})`);
+          // Aquí podrías guardar en tu propia base de datos
+        }
+      }
+    }
+  }
+}
+
+main().catch(console.error);
+```
+
+### Enviar mensaje desde otro servicio
+
+```python
+import requests
+
+API = "http://localhost:9878"
+KEY = "mi-api-key"
 
 # Enviar texto
-curl -X POST "$API/api/send" \
-  -H "Authorization: Bearer $KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"to":"5215512345678","text":"Hola desde la API"}'
+resp = requests.post(
+    f"{API}/api/send",
+    headers={"Authorization": f"Bearer {KEY}"},
+    json={"to": "5215512345678", "text": "Hola desde Python"}
+)
+print(resp.json())
 
-# Ver estado
-curl -H "Authorization: Bearer $KEY" "$API/api/status"
-
-# Cerrar sesión
-curl -X DELETE -H "Authorization: Bearer $KEY" "$API/api/session"
-
-# Polling de mensajes entrantes
-curl -H "Authorization: Bearer $KEY" "$API/api/messages?since=2025-05-08T12:00:00Z&limit=10"
-
-# SSE streaming (habilitado por defecto)
-curl -N -H "Authorization: Bearer $KEY" "$API/api/messages/stream?types=text,image"
+# Verificar estado
+status = requests.get(
+    f"{API}/api/status",
+    headers={"Authorization": f"Bearer {KEY}"}
+)
+print(status.json()["data"])
 ```
+
+---
+
+## Health check
+
+```
+GET /health
+```
+
+```json
+{
+  "status": "healthy",
+  "connection": "connected",
+  "phoneNumber": "5215512345678",
+  "uptimeSeconds": 84321,
+  "reconnections": 2
+}
+```
+
+Este endpoint **no requiere autenticación**. Está diseñado para orquestadores (Kubernetes, Docker Swarm, etc.). Corre en el puerto `HEALTH_PORT` (default `9877`), separado de la API REST.
