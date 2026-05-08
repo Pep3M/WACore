@@ -1,0 +1,77 @@
+# ============================================================
+# WACore - Docker Compose (desarrollo / producción single-node)
+# ============================================================
+# Uso:
+#   docker compose up -d                    # Arrancar todo
+#   docker compose up -d wacore             # Solo wacore
+#   docker compose logs -f wacore           # Ver logs
+#   docker compose down -v                  # Parar y borrar volúmenes
+# ============================================================
+
+services:
+  # --- Servicio principal WACore ---
+  wacore:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wacore
+    volumes:
+      # Persistencia de sesiones (CRÍTICO: sin esto, hay que re-escanear QR cada vez)
+      - wa_sessions:/data/sessions
+      # Hot-reload en desarrollo: monta src/ local sobre la imagen
+      - ./src:/app/src
+    ports:
+      - "${HEALTH_PORT:-9877}:9877"
+    environment:
+      - WA_INSTANCE_NAME=${WA_INSTANCE_NAME:-bot-dev}
+      - HEALTH_PORT=${HEALTH_PORT:-9877}
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - SESSION_STORE=${SESSION_STORE:-file}
+      - SESSION_DIR=/data/sessions
+      - CONNECT_ON_STARTUP=${CONNECT_ON_STARTUP:-true}
+      - QR_TIMEOUT=${QR_TIMEOUT:-60000}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
+      - WEBHOOK_EVENTS=${WEBHOOK_EVENTS:-message}
+      - WEBHOOK_RETRY_COUNT=${WEBHOOK_RETRY_COUNT:-3}
+      - WEBHOOK_RETRY_DELAY=${WEBHOOK_RETRY_DELAY:-5000}
+      - API_KEY=${API_KEY:-}
+      - NODE_ENV=${NODE_ENV:-development}
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  # --- Redis (sesiones / colas) ---
+  redis:
+    image: redis:7-alpine
+    container_name: wacore-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    # Descomentar si se requiere autenticación:
+    # command: redis-server --requirepass ${REDIS_PASSWORD:-}
+
+  # --- Webhook sink (inspector de webhooks en desarrollo) ---
+  # Recibe los webhooks que envía WACore y los muestra en una UI web.
+  # URL: http://localhost:9000
+  webhook-sink:
+    image: webhooksite/webhook:latest
+    container_name: wacore-webhook-sink
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+    profiles:
+      - dev
+      - debug
+
+volumes:
+  wa_sessions:
+  redis_data:

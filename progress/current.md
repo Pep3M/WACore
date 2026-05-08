@@ -1,24 +1,35 @@
 # Sesión actual
 
-> Este archivo se vacía al cerrar cada sesión y se mueve a `history.md`.
-> Mientras trabajas, **mantenlo actualizado en tiempo real**, no al final.
-
-- **Feature en curso:** {RF-XX}
-- **Fase:** {fase actual}
-- **Inicio:** {DATE}
-- **Agente:** {quién está trabajando}
+- **Feature en curso:** Diseño de arquitectura core (RF-01 + RF-02 + RF-03 + INFRA-01)
+- **Fase:** designing → planned
+- **Inicio:** 2025-05-08
+- **Agente:** @software-architect
 
 ## Plan
 
-- {Tarea 1}
-- {Tarea 2}
-- {Tarea 3}
+1. ~~Diseñar arquitectura completa del sistema~~ ✔
+2. ~~Registrar diseño en progress/design-core-backend.md~~ ✔
+3. ~~Desglosar tareas en progress/tasks.md~~ ✔
+4. ~~Crear infraestructura Docker (Dockerfile, docker-compose, .dockerignore)~~ ✔
+5. ~~Actualizar .env.example con todas las variables~~ ✔
+6. ~~Crear estructura de módulos y stubs~~ ✔
+7. Siguiente fase: @developer implementa módulo por módulo
 
 ## Bitácora
 
-- **{Hora/evento}:** {Descripción de lo que se hizo}
-- **{Hora/evento}:** {Descripción}
+- **Inicio de sesión:** Creación del diseño arquitectónico completo para WACore
+- **Arquitectura:** Definidos 10 componentes, flujo event-driven, pub/sub interno
+- **Persistencia:** FileStore como default, interfaz extensible para Redis/DB
+- **Reconexión:** Tabla completa de backoff strategies por disconnect reason
+- **Transporte:** Webhooks como integración primaria, REST API opcional con API Key
+- **Docker:** Multi-stage build, docker-compose con Redis + webhook sink, volumen de sesiones
+- **Logging:** pino → stdout JSON, eventos categorizados, sanitización de datos sensibles
+- **Tasks:** 22 tareas desglosadas en el tracker
+- **Stubs:** 14 archivos fuente creados con interfaces y documentación del diseño
 
 ## Próximo paso
 
-{Qué sigue después de esta sesión}
+Iniciar implementación con los módulos fundacionales:
+1. `src/utils/logger.ts` + `src/types.ts` + `src/config.ts`
+2. `src/core/event-bus.ts`
+3. `src/storage/session-store.ts` + `src/storage/file-store.ts`

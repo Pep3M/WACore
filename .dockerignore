@@ -1,0 +1,15 @@
+.env
+.env.*
+.git/
+.gitignore
+node_modules/
+progress/
+.opencode/
+bun.lock
+*.md
+!.env.example
+coverage/
+logs/
+*.tgz
+.DS_Store
+.idea/
