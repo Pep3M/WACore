@@ -15,6 +15,7 @@ WORKDIR /app
 COPY package.json bun.lock tsconfig.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY src/ ./src/
+COPY migrations/ ./migrations/
 
 ENV NODE_ENV=production
 
