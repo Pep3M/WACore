@@ -1,9 +1,9 @@
 # Sesión actual
 
 - **Feature en curso:** RF-05: PostgreSQL Session Store
-- **Fase:** implementing → done
+- **Fase:** implementing → done → testing → **CHANGES_REQUESTED**
 - **Inicio:** 2026-05-08
-- **Agente:** @developer
+- **Agente:** @qa-tester
 
 ## Bitácora
 
@@ -43,11 +43,18 @@
 - Resultado: 199 tests pass, 0 fail (385 expect calls)
 - Typecheck: `tsc --noEmit` → 0 errores
 
+### QA Review (2026-05-08)
+- Ejecutados: `npx tsc --noEmit` → 0 errores ✅
+- Ejecutados: `bun test` → 199 pass, 0 fail ✅
+- Revisión de código completada en 14 archivos
+- **Hallazgo CRITICAL**: `package.json` no incluye `drizzle-orm` ni `postgres` en `dependencies` — el contenedor Docker no tendrá estas dependencias runtime
+- Reporte completo: `progress/review-postgres-session-store.md`
+
 ## Resumen de sesión
 
 | Feature | Archivos modificados/creados | Estado |
 |---------|------------------------------|--------|
-| RF-05 PostgreSQL Session Store | 14 archivos | ✅ DONE |
+| RF-05 PostgreSQL Session Store | 14 archivos | 🔶 CHANGES_REQUESTED |
 | postgres-db.ts | Schema Drizzle + waitForPostgres + runMigrations + createConnection | ✅ |
 | postgres-store.ts | PostgresStore (SessionStore impl) | ✅ |
 | session-store.ts | + case 'postgres' | ✅ |
@@ -58,3 +65,4 @@
 | docker-compose.yml | + postgres service | ✅ |
 | .env.example | + DATABASE_URL | ✅ |
 | postgres-store.test.ts | 24 tests | ✅ |
+| package.json | ❌ **CRITICAL**: faltan `drizzle-orm` y `postgres` en dependencies | ❌ |
