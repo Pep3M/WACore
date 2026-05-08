@@ -49,11 +49,21 @@ export async function createBaileysClient(
       printQRInTerminal: true,
       logger: {
         trace: (...args: any[]) => logger.debug(formatBaileysArg(args[0]), { source: 'baileys' }),
+        debug: (...args: any[]) => logger.debug(formatBaileysArg(args[0]), { source: 'baileys' }),
         info: (...args: any[]) => logger.info(formatBaileysArg(args[0]), { source: 'baileys' }),
         warn: (...args: any[]) => logger.warn(formatBaileysArg(args[0]), { source: 'baileys' }),
         error: (...args: any[]) => logger.error(formatBaileysArg(args[0]), { source: 'baileys' }),
-        debug: (...args: any[]) => logger.debug(formatBaileysArg(args[0]), { source: 'baileys' }),
-        child: (): any => logger,
+        child: () => {
+          const childLogger = {
+            trace: (...args: any[]) => logger.debug(formatBaileysArg(args[0]), { source: 'baileys.child' }),
+            debug: (...args: any[]) => logger.debug(formatBaileysArg(args[0]), { source: 'baileys.child' }),
+            info: (...args: any[]) => logger.info(formatBaileysArg(args[0]), { source: 'baileys.child' }),
+            warn: (...args: any[]) => logger.warn(formatBaileysArg(args[0]), { source: 'baileys.child' }),
+            error: (...args: any[]) => logger.error(formatBaileysArg(args[0]), { source: 'baileys.child' }),
+            child: () => childLogger,
+          };
+          return childLogger;
+        },
       } as any,
       syncFullHistory: false,
       fireInitQueries: true,
