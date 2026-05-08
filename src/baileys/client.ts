@@ -48,15 +48,14 @@ export async function createBaileysClient(
       auth: authProvider.state as any,
       printQRInTerminal: true,
       logger: {
-        info: (...args: any[]) => logger.info(String(args[0]), { source: 'baileys' }),
-        warn: (...args: any[]) => logger.warn(String(args[0]), { source: 'baileys' }),
-        error: (...args: any[]) => logger.error(String(args[0]), { source: 'baileys' }),
-        debug: (...args: any[]) => logger.debug(String(args[0]), { source: 'baileys' }),
+        info: (...args: any[]) => logger.info(formatBaileysArg(args[0]), { source: 'baileys' }),
+        warn: (...args: any[]) => logger.warn(formatBaileysArg(args[0]), { source: 'baileys' }),
+        error: (...args: any[]) => logger.error(formatBaileysArg(args[0]), { source: 'baileys' }),
+        debug: (...args: any[]) => logger.debug(formatBaileysArg(args[0]), { source: 'baileys' }),
         child: (): any => logger,
       } as any,
       syncFullHistory: false,
       fireInitQueries: true,
-      shouldSyncHistoryMessage: () => false,
     });
 
     sock.ev.on('connection.update', async (update) => {
@@ -161,6 +160,13 @@ export async function createBaileysClient(
       updateStatus('logged-out');
     },
   };
+}
+
+function formatBaileysArg(arg: unknown): string {
+  if (typeof arg === 'object' && arg !== null) {
+    try { return JSON.stringify(arg); } catch { return String(arg); }
+  }
+  return String(arg);
 }
 
 function mapDisconnectReason(statusCode?: number): import('../types').DisconnectReason {

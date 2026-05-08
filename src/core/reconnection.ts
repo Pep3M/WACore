@@ -12,6 +12,7 @@ const BACKOFF_STRATEGIES: Record<string, BackoffConfig | undefined> = {
   restartRequired:   { initialDelay: 500, maxDelay: 5000, factor: 1.5, maxAttempts: 20 },
   multidevice:       { initialDelay: 0, maxDelay: 0, factor: 1, maxAttempts: 0 },
   forbidden:         { initialDelay: 0, maxDelay: 0, factor: 1, maxAttempts: 0 },
+  unknown:           { initialDelay: 2000, maxDelay: 30000, factor: 2, maxAttempts: 10 },
 };
 
 export interface ReconnectionManager {
