@@ -9,6 +9,7 @@ import { createSessionStore } from './storage/session-store';
 import { createAuthProvider } from './baileys/auth';
 import { createBaileysClient } from './baileys/client';
 import { createMessageSender } from './services/message-sender';
+import { createCommandRegistry } from './commands/registry';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -32,6 +33,38 @@ async function main(): Promise<void> {
     () => client.logout(),
   );
 
+  // ─── Command system ─────────────────────────────────────────
+  const commandRegistry = createCommandRegistry(
+    eventBus,
+    (to, text) => messageSender.sendText(to, text),
+    logger,
+  );
+
+  commandRegistry.register({
+    name: 'ping',
+    description: 'Responde con pong y el tiempo de respuesta',
+    handler: async (_msg, _args, reply) => {
+      const start = Date.now();
+      await reply('🏓 Pong!');
+      const elapsed = Date.now() - start;
+      await reply(`⏱️ ${elapsed}ms`);
+    },
+  });
+
+  commandRegistry.register({
+    name: 'help',
+    aliases: ['h', 'comandos'],
+    description: 'Muestra la lista de comandos disponibles',
+    handler: async (_msg, _args, reply) => {
+      const list = commandRegistry.getAll()
+        .map(cmd => `• *!${cmd.name}* ${cmd.usage ? `\`${cmd.usage}\` ` : ''}— ${cmd.description}`)
+        .join('\n');
+      await reply(`📋 *Comandos disponibles:*\n\n${list}`);
+    },
+  });
+
+  commandRegistry.start();
+
   // ─── Start subsystems ───────────────────────────────────────
   healthMonitor.start();
   messageRouter.start();
@@ -45,6 +78,7 @@ async function main(): Promise<void> {
   // ─── Handle shutdown ────────────────────────────────────────
   const shutdown = async (signal: string) => {
     logger.info('Shutdown signal received', { signal });
+    commandRegistry.stop();
     await client.stop();
     webhookDispatcher.stop();
     messageRouter.stop();

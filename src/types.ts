@@ -197,3 +197,24 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
 }
+
+// ─── Sistema de comandos ────────────────────────────────────────
+
+export interface Command {
+  name: string;
+  aliases?: string[];
+  description: string;
+  usage?: string;
+  handler: (message: NormalizedMessage, args: string[], reply: ReplyFn) => void | Promise<void>;
+}
+
+export type ReplyFn = (text: string) => Promise<string>;
+
+export interface CommandRegistry {
+  register(command: Command): void;
+  unregister(name: string): void;
+  get(name: string): Command | undefined;
+  getAll(): Command[];
+  start(): void;
+  stop(): void;
+}

@@ -69,8 +69,8 @@
 ## Estado actual
 
 - **TypeScript:** 0 errores ✅
-- **Tests:** 124/124 pass (249 assertions, 15 archivos) ✅
-- **Cobertura:** 15/20 archivos fuente con tests directos (75%)
+- **Tests:** 145/145 pass (283 assertions, 16 archivos) ✅
+- **Cobertura:** 16/21 archivos fuente con tests directos (76%)
 - **Veredicto QA:** **APPROVED** ✅
 
 ## Integration Tests Baileys
@@ -90,17 +90,27 @@
 
 ---
 
+## Sistema de comandos (RF-02)
+
+- **Feature:** Sistema extensible de comandos del bot
+- **Fase:** implementing → done
+- **Archivos:** `src/commands/registry.ts`, `src/types.ts` (tipos `Command`, `CommandRegistry`)
+- **Integración:** `src/index.ts` — registra comandos `!ping` y `!help` al arrancar
+- **Tests:** 21 tests en `src/__tests__/command-registry.test.ts` (registro, ejecución, alias, prefijo personalizado, errores, stop)
+- **Resultados:** 145/145 tests totales (283 assertions), 0 TypeScript errors ✅
+
 ### Resumen de sesión
 
 | Feature | Fase | Estado |
 |---------|------|--------|
 | Core backend (RF-01+RF-02+RF-03+INFRA-01) | Diseño → Impl → QA | ✅ Completado |
 | RedisStore (sesiones persistentes) | Implementación directa | ✅ Completado (13 tests) |
+| Integration tests Baileys | Implementación | ✅ Completado (26 tests) |
+| Sistema de comandos (RF-02) | Implementación | ✅ Completado (21 tests) |
 
 ## Próximos pasos
 
-Core backend completado. Próximas iteraciones:
-1. ~~Implementar RedisStore~~ ✅
-2. ~~HMAC real en webhook-dispatcher~~ ✅
-3. ~~Tests de integración con Baileys real~~ ✅
-4. Feature: sistema de comandos (RF-02)
+Todas las features planificadas están implementadas. Próximas iteraciones propuestas:
+1. Tests de integración con Baileys real (end-to-end con conexión real)
+2. Comandos adicionales (admin, stats, etc.)
+3. Mejora de cobertura de tests (~76% actual)
