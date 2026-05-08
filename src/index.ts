@@ -33,6 +33,16 @@ async function main(): Promise<void> {
     () => client.logout(),
   );
 
+  // ─── Bridge: connection updates → health monitor ─────────────
+  let wasConnected = false;
+  eventBus.on('connection.update', (update) => {
+    healthMonitor.updateConnection(update.status as any, update.phoneNumber);
+    if (update.status === 'connected') {
+      if (wasConnected) healthMonitor.incrementReconnections();
+      wasConnected = true;
+    }
+  });
+
   // ─── Command system ─────────────────────────────────────────
   const commandRegistry = createCommandRegistry(
     eventBus,
