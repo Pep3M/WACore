@@ -31,6 +31,10 @@
 | RF-04.1 | IncomingMessageHub (RingBuffer + handlers) | done | — | @developer | @qa-tester | — | done | approved |
 | RF-04.2 | Polling REST API (GET /api/messages) | done | — | @developer | @qa-tester | — | done | approved |
 | RF-04.3 | SSE Transport (GET /api/messages/stream) | done | — | @developer | @qa-tester | — | done | approved |
+| RF-05 | PostgreSQL Session Store | done | @software-architect | @developer | — | done | done | — |
+| RF-05.1 | PostgresStore (SessionStore impl) | done | — | @developer | — | — | done | — |
+| RF-05.2 | Migraciones automáticas (Drizzle) | done | — | @developer | — | — | done | — |
+| RF-05.3 | Docker entrypoint + compose | done | — | @developer | — | — | done | — |
 
 ---
 

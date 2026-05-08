@@ -13,6 +13,7 @@ export function loadConfig(): EnvConfig {
     logLevel: (Bun.env.LOG_LEVEL as EnvConfig['logLevel']) || 'info',
     sessionStore: (Bun.env.SESSION_STORE as EnvConfig['sessionStore']) || 'file',
     sessionDir: Bun.env.SESSION_DIR || '/data/sessions',
+    databaseUrl: Bun.env.DATABASE_URL,
     redisUrl: Bun.env.REDIS_URL,
     webhookUrl: Bun.env.WEBHOOK_URL,
     webhookSecret: Bun.env.WEBHOOK_SECRET,

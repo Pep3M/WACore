@@ -1,42 +1,60 @@
 # Sesión actual
 
-- **Feature en curso:** RF-04: Mecanismos de Entrega de Mensajes Entrantes
-- **Fase:** implementing → testing → changes_requested → done
+- **Feature en curso:** RF-05: PostgreSQL Session Store
+- **Fase:** implementing → done
 - **Inicio:** 2026-05-08
-- **Agente:** @developer (fixes post-QA)
-
-## Plan — QA Fixes
-
-1. ~~Leer archivos de implementación (3 source files + tests)~~ ✔
-2. ~~M-01: SSE `stop()` limpia handlers + heartbeats~~ ✔
-3. ~~m-01: `cancel()` remueve controller de `activeStreams`~~ ✔
-4. ~~m-02: `since` inválido tratado como 0 (no NaN)~~ ✔
-5. ~~m-03: `limit` no-numérico normalizado a 50~~ ✔
-6. ~~m-04: Abort listener con `{ once: true }`~~ ✔
-7. ~~Ejecutar `tsc --noEmit`: 0 errores~~ ✔
-8. ~~Ejecutar `bun test`: 178/178 pass~~ ✔
+- **Agente:** @developer
 
 ## Bitácora
 
-- **Fixes aplicados a `sse-transport.ts`:**
-  - `activeStreams` convertido de `Set<Controller>` a `Map<Controller, StreamEntry>` (M-01, m-01)
-  - `stop()` ahora itera sobre `activeStreams.values()`, limpia heartbeats y handlers, luego `clear()` (M-01)
-  - `cancel()` remueve su entrada del Map usando `streamController` guardado en closure (m-01)
-  - Abort listener usa `{ once: true }` para auto-remoción (m-04)
-- **Fix aplicado a `incoming-message-hub.ts`:**
-  - `sinceTs` validado con `isNaN()`; si es NaN se usa 0 (m-02)
-- **Fix aplicado a `rest-api.ts`:**
-  - `limit` normalizado: `parseInt` validado con `isNaN()`, cap a Math.min(parsed, 200) (m-03)
-- **Typecheck:** `tsc --noEmit` → 0 errores ✅
-- **Tests:** `bun test` → 178/178 pass, 355 expect() calls ✅
+### Fase 1: Dependencias y schema
+- Instaladas dependencias: `drizzle-orm@0.45.2`, `postgres@3.4.9`, `drizzle-kit@0.31.10`
+- Creado `src/storage/postgres-db.ts` con schema Drizzle (`wacore_sessions`), `waitForPostgres()`, `runMigrations()`, `createConnection()`
+- Creado `drizzle.config.ts` apuntando al schema
+- Generada migración inicial `migrations/0000_nappy_matthew_murdock.sql` (CREATE TABLE wacore_sessions)
+
+### Fase 2: PostgresStore
+- Creado `src/storage/postgres-store.ts` con clase `PostgresStore` implementando `SessionStore`
+- Métodos: `save()` (INSERT ON CONFLICT DO UPDATE con BufferJSON.replacer), `load()` (SELECT con BufferJSON.reviver), `delete()`, `exists()`, `backup()` (no-op), `disconnect()`
+- Pool configurado con `max: 3, idle_timeout: 30, connect_timeout: 10`
+
+### Fase 3: Startup gate
+- `waitForPostgres()`: retry loop con backoff lineal (~1s, 1.5s, 2.25s...) hasta 30s timeout
+- `runMigrations()`: usa `drizzle-orm/postgres-js/migrator` → `migrate(db, { migrationsFolder: './migrations' })`
+- Integrado en `src/index.ts`: bloque `if (config.sessionStore === 'postgres')` al inicio de `main()`
+- Integrado en `session-store.ts`: case `'postgres'` con dynamic import
+
+### Fase 4: Tipos y configuración
+- `EnvConfig.databaseUrl?: string` añadido en `src/types/index.ts`
+- `config.ts`: lee `Bun.env.DATABASE_URL`
+- `.env.example`: añadido `DATABASE_URL=postgres://...`
+
+### Fase 5: Docker e infraestructura
+- `Dockerfile`: `COPY --from=build /app/migrations ./migrations` + `--start-period=60s`
+- `docker-compose.yml`: servicio `postgres:16-alpine` + `DATABASE_URL` en wacore + `depends_on` con healthcheck
+
+### Fase 6: Tests
+- Creado `src/__tests__/postgres-store.test.ts` con 24 tests:
+  - PostgresStore: exists, load, save, delete, backup, disconnect, error handling, constructor validation
+  - Buffer round-trip: BufferJSON.replacer/reviver con base64
+  - waitForPostgres: éxito inmediato, timeout
+  - runMigrations: verificar que llama a migrate() y end()
+  - createConnection: verificar que retorna sql + db
+- Resultado: 199 tests pass, 0 fail (385 expect calls)
+- Typecheck: `tsc --noEmit` → 0 errores
 
 ## Resumen de sesión
 
-| Feature | Fase | Estado |
-|---------|------|--------|
-| RF-04: QA Fixes | Fixes aplicados | ✅ DONE |
-| M-01 SSE memory leak | `sse-transport.ts` — stop() limpia handlers/timers | ✅ FIXED |
-| m-01 cancel() cleanup | `sse-transport.ts` — cancel() remueve de activeStreams | ✅ FIXED |
-| m-02 since NaN | `incoming-message-hub.ts` — validSince con isNaN check | ✅ FIXED |
-| m-03 limit NaN | `rest-api.ts` — limit normalizado con parseInt + isNaN | ✅ FIXED |
-| m-04 abort listener | `sse-transport.ts` — addEventListener con once:true | ✅ FIXED |
+| Feature | Archivos modificados/creados | Estado |
+|---------|------------------------------|--------|
+| RF-05 PostgreSQL Session Store | 14 archivos | ✅ DONE |
+| postgres-db.ts | Schema Drizzle + waitForPostgres + runMigrations + createConnection | ✅ |
+| postgres-store.ts | PostgresStore (SessionStore impl) | ✅ |
+| session-store.ts | + case 'postgres' | ✅ |
+| index.ts | + PostgreSQL startup gate | ✅ |
+| types/index.ts | + databaseUrl? | ✅ |
+| config.ts | + databaseUrl | ✅ |
+| Dockerfile | + migrations + start-period | ✅ |
+| docker-compose.yml | + postgres service | ✅ |
+| .env.example | + DATABASE_URL | ✅ |
+| postgres-store.test.ts | 24 tests | ✅ |

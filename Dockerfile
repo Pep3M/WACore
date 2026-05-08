@@ -29,12 +29,13 @@ COPY --from=build /app/src ./src
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/tsconfig.json ./tsconfig.json
+COPY --from=build /app/migrations ./migrations
 
 RUN mkdir -p /data/sessions /data/logs && chown -R bun:bun /data /app
 
 USER bun
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -sf http://localhost:${HEALTH_PORT:-9877}/health || exit 1
 
 EXPOSE 9877

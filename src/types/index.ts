@@ -9,6 +9,7 @@ export interface EnvConfig {
   logLevel: 'debug' | 'info' | 'warn' | 'error';
   sessionStore: 'file' | 'redis' | 'postgres';
   sessionDir: string;
+  databaseUrl?: string;
   redisUrl?: string;
   webhookUrl?: string;
   webhookSecret?: string;

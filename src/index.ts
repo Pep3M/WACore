@@ -16,6 +16,24 @@ import { createCommandRegistry } from './commands/registry';
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
+
+  // ─── PostgreSQL startup gate ──────────────────────────────
+  if (config.sessionStore === 'postgres') {
+    if (!config.databaseUrl) {
+      logger.error('SESSION_STORE=postgres requires DATABASE_URL');
+      process.exit(1);
+    }
+    const { waitForPostgres, runMigrations } = await import('./storage/postgres-db');
+    try {
+      await waitForPostgres(config.databaseUrl, logger, 30_000);
+      await runMigrations(config.databaseUrl, logger);
+      logger.info('PostgreSQL ready, migrations applied');
+    } catch (err) {
+      logger.error('PostgreSQL startup failed', { error: String(err) });
+      process.exit(1);
+    }
+  }
+
   const eventBus = createEventBus();
   const sessionStore = await createSessionStore(config, logger);
   const authProvider = await createAuthProvider(sessionStore, logger);
