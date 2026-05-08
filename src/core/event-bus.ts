@@ -2,6 +2,8 @@ import type { WACoreEventMap, WACoreEventName } from '../types';
 
 type EventHandler<E extends WACoreEventName> = (data: WACoreEventMap[E]) => void | Promise<void>;
 
+type ErrorHandler = (event: string, err: unknown) => void;
+
 interface HandlerEntry {
   handler: EventHandler<any>;
   once: boolean;
@@ -16,7 +18,7 @@ export interface EventBus {
   listenerCount(event: WACoreEventName): number;
 }
 
-export function createEventBus(): EventBus {
+export function createEventBus(onError?: ErrorHandler): EventBus {
   const listeners = new Map<string, HandlerEntry[]>();
 
   function getHandlers(event: string): HandlerEntry[] {
@@ -54,11 +56,11 @@ export function createEventBus(): EventBus {
           const result = entry.handler(data);
           if (result instanceof Promise) {
             result.catch(err => {
-              console.error(`[EventBus] Error in handler for "${event}":`, err);
+              (onError ?? console.error)(event, err);
             });
           }
         } catch (err) {
-          console.error(`[EventBus] Error in handler for "${event}":`, err);
+          (onError ?? console.error)(event, err);
         }
       }
     },

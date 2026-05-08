@@ -5,6 +5,7 @@
 export interface EnvConfig {
   instanceName: string;
   healthPort: number;
+  apiPort: number;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
   sessionStore: 'file' | 'redis' | 'postgres';
   sessionDir: string;

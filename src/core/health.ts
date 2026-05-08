@@ -16,6 +16,7 @@ export function createHealthMonitor(
 ): HealthMonitor {
   let connection: ConnectionStatus = 'disconnected';
   let phoneNumber: string | null = null;
+  let showPhoneNumber = false;
   let reconnections = 0;
   const startTime = Date.now();
   let server: ReturnType<typeof Bun.serve> | null = null;
@@ -27,7 +28,7 @@ export function createHealthMonitor(
               : connection === 'connecting' || connection === 'awaiting-qr' ? 'degraded' as const
               : 'unhealthy' as const,
         connection,
-        phoneNumber,
+        ...(showPhoneNumber ? { phoneNumber } : {}),
         uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
         reconnections,
       });
@@ -51,9 +52,9 @@ export function createHealthMonitor(
       server = null;
     },
 
-    updateConnection(status, phone) {
+    updateConnection(status, phone, exposePhone = false) {
       connection = status;
-      if (phone) phoneNumber = phone;
+      if (phone) { phoneNumber = phone; showPhoneNumber = exposePhone; }
     },
 
     incrementReconnections() {

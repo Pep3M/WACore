@@ -1,11 +1,21 @@
 import type { EventBus } from './event-bus';
 import type { Logger } from '../utils/logger';
-import type { NormalizedMessage, MessageType } from '../types';
+import type { NormalizedMessage, MessageType, WACoreEventName } from '../types';
 
 export interface MessageRouter {
   start(): void;
   stop(): void;
 }
+
+const MESSAGE_EVENTS: Record<MessageType, WACoreEventName> = {
+  text: 'message.text',
+  image: 'message.image',
+  video: 'message.video',
+  document: 'message.document',
+  audio: 'message.audio',
+  reaction: 'message.reaction',
+  unknown: 'message.text',
+};
 
 export function createMessageRouter(eventBus: EventBus, logger: Logger): MessageRouter {
   function normalize(raw: any): NormalizedMessage | null {
@@ -37,8 +47,7 @@ export function createMessageRouter(eventBus: EventBus, logger: Logger): Message
       eventBus.on('message', (raw: any) => {
         const normalized = normalize(raw);
         if (!normalized) return;
-        eventBus.emit('message', normalized);
-        eventBus.emit(`message.${normalized.type}` as any, normalized);
+      eventBus.emit(MESSAGE_EVENTS[normalized.type] ?? 'message.text', normalized);
       });
       logger.info('Message router started');
     },

@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, unlinkSync } from 'node:fs';
 import type { Logger } from '../utils/logger';
 import type { EnvConfig } from '../types';
 import type { SessionStore } from './session-store';
@@ -74,8 +74,8 @@ export class FileStore implements SessionStore {
 
   async delete(): Promise<void> {
     try {
-      await Bun.write(this.credsPath(), '');
-      await Bun.write(this.keysPath(), '');
+      try { unlinkSync(this.credsPath()); } catch {}
+      try { unlinkSync(this.keysPath()); } catch {}
       this.logger.warn('Session deleted');
     } catch (err) {
       this.logger.error('Failed to delete session', { error: String(err) });

@@ -302,7 +302,8 @@ Para integraciones locales (mismo proceso), el paso 7-9 se salta: el consumidor 
 | Variable | Requerida | Default | Descripción |
 |---|---|---|---|
 | `WA_INSTANCE_NAME` | Sí | — | Identificador único de la instancia |
-| `HEALTH_PORT` | No | `3000` | Puerto del health check HTTP |
+| `HEALTH_PORT` | No | `9877` | Puerto del health check HTTP |
+| `API_PORT` | No | `9878` | Puerto de la REST API |
 | `LOG_LEVEL` | No | `info` | debug, info, warn, error |
 | `SESSION_STORE` | No | `file` | file, redis, postgres |
 | `SESSION_DIR` | No | `/data/sessions` | Directorio para file-store |

@@ -1,6 +1,6 @@
 import type { EventBus } from '../core/event-bus';
 import type { Logger } from '../utils/logger';
-import type { EnvConfig, WebhookPayload } from '../types';
+import type { EnvConfig, WebhookPayload, WACoreEventName } from '../types';
 import type { CircuitBreaker } from './circuit-breaker';
 import { createCircuitBreaker } from './circuit-breaker';
 import { sleep } from '../utils/retry';
@@ -110,19 +110,27 @@ export function createWebhookDispatcher(
     start() {
       active = true;
 
-      eventBus.on('message', (data: any) => {
-        if (!active || !allowedEvents.has('message')) return;
-        deliver(createPayload('message', data as any));
-      });
+      if (allowedEvents.has('message')) {
+        const messageEvents: WACoreEventName[] = [
+          'message.text', 'message.image', 'message.video',
+          'message.document', 'message.audio', 'message.reaction',
+        ];
+        for (const eventName of messageEvents) {
+          eventBus.on(eventName, (data) => {
+            if (!active) return;
+            deliver(createPayload('message', data as unknown as Record<string, unknown>));
+          });
+        }
+      }
 
       eventBus.on('connection.update', (data) => {
         if (!active || !allowedEvents.has('connection')) return;
-        deliver(createPayload('connection', data as any));
+        deliver(createPayload('connection', data as unknown as Record<string, unknown>));
       });
 
       eventBus.on('qr', (data) => {
         if (!active || !allowedEvents.has('qr')) return;
-        deliver(createPayload('qr', data as any));
+        deliver(createPayload('qr', data as unknown as Record<string, unknown>));
       });
 
       logger.info('Webhook dispatcher started', {

@@ -4,27 +4,27 @@
 
 | ID | Feature / Tarea | Estado | Arquitecto | Developer | QA | Diseño | Implementación | Review |
 |---|---|---|---|---|---|---|---|---|
-| RF-01 | Conexión y autenticación WhatsApp | designing | @software-architect | — | — | done | — | — |
-| RF-01.1 | Config + types base | planned | @software-architect | — | — | done | — | — |
-| RF-01.2 | Logger estructurado | planned | @software-architect | — | — | done | — | — |
-| RF-01.3 | Event Bus tipado | planned | @software-architect | — | — | done | — | — |
-| RF-01.4 | SessionStore + FileStore | planned | @software-architect | — | — | done | — | — |
-| RF-01.5 | Auth wrapper Baileys | planned | @software-architect | — | — | done | — | — |
-| RF-01.6 | Cliente socket + ciclo de vida | planned | @software-architect | — | — | done | — | — |
-| RF-01.7 | Handlers de eventos | planned | @software-architect | — | — | done | — | — |
-| RF-01.8 | Reconnection manager | planned | @software-architect | — | — | done | — | — |
-| RF-01.9 | Health monitor HTTP | planned | @software-architect | — | — | done | — | — |
-| RF-01.10 | Bootstrap + wiring | planned | @software-architect | — | — | done | — | — |
-| RF-02 | Sistema de mensajería | backlog | — | — | — | — | — | — |
-| RF-02.1 | Message Router | planned | @software-architect | — | — | done | — | — |
-| RF-02.2 | Message Sender | planned | @software-architect | — | — | done | — | — |
-| RF-03 | Capa de integración externa | backlog | — | — | — | — | — | — |
-| RF-03.1 | Circuit breaker | planned | @software-architect | — | — | done | — | — |
-| RF-03.2 | Webhook dispatcher | planned | @software-architect | — | — | done | — | — |
-| RF-03.3 | REST API | planned | @software-architect | — | — | done | — | — |
-| INFRA-01 | Docker infraestructura | planned | @software-architect | — | — | done | — | — |
-| INFRA-01.1 | Dockerfile multi-stage | planned | @software-architect | — | — | done | — | — |
-| INFRA-01.2 | docker-compose.yml | planned | @software-architect | — | — | done | — | — |
+| RF-01 | Conexión y autenticación WhatsApp | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-01.1 | Config + types base | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-01.2 | Logger estructurado | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-01.3 | Event Bus tipado | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-01.4 | SessionStore + FileStore | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-01.5 | Auth wrapper Baileys | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-01.6 | Cliente socket + ciclo de vida | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-01.7 | Handlers de eventos | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-01.8 | Reconnection manager | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-01.9 | Health monitor HTTP | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-01.10 | Bootstrap + wiring | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-02 | Sistema de mensajería | done | — | @developer | @qa-tester | done | done | approved |
+| RF-02.1 | Message Router | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-02.2 | Message Sender | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-03 | Capa de integración externa | done | — | @developer | @qa-tester | done | done | approved |
+| RF-03.1 | Circuit breaker | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-03.2 | Webhook dispatcher | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| RF-03.3 | REST API | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| INFRA-01 | Docker infraestructura | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| INFRA-01.1 | Dockerfile multi-stage | done | @software-architect | @developer | @qa-tester | done | done | approved |
+| INFRA-01.2 | docker-compose.yml | done | @software-architect | @developer | @qa-tester | done | done | approved |
 | INFRA-01.3 | .dockerignore | done | @software-architect | — | — | done | — | — |
 
 ---

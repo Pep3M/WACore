@@ -14,7 +14,7 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
   const eventBus = createEventBus();
-  const sessionStore = createSessionStore(config, logger);
+  const sessionStore = await createSessionStore(config, logger);
   const authProvider = await createAuthProvider(sessionStore, logger);
   const client = await createBaileysClient(config, eventBus, authProvider, logger);
   const messageSender = createMessageSender(client, eventBus, logger);
@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   const messageRouter = createMessageRouter(eventBus, logger);
   const webhookDispatcher = createWebhookDispatcher(eventBus, config, logger);
   const restApi = createRestApi(
-    config.healthPort,
+    config.apiPort,
     config,
     logger,
     (to, text) => messageSender.sendText(to, text),

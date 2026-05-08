@@ -9,7 +9,7 @@ export interface SessionStore {
   backup(): Promise<void>;
 }
 
-export function createSessionStore(config: EnvConfig, logger: Logger): SessionStore {
+export async function createSessionStore(config: EnvConfig, logger: Logger): Promise<SessionStore> {
   switch (config.sessionStore) {
     case 'file':
       return createFileStore(config, logger);
@@ -21,12 +21,12 @@ export function createSessionStore(config: EnvConfig, logger: Logger): SessionSt
     }
 }
 
-function createFileStore(config: EnvConfig, logger: Logger): SessionStore {
-  const { FileStore } = require('./file-store');
+async function createFileStore(config: EnvConfig, logger: Logger): Promise<SessionStore> {
+  const { FileStore } = await import('./file-store');
   return new FileStore(config, logger);
 }
 
-function createRedisStore(config: EnvConfig, logger: Logger): SessionStore {
-  const { RedisStore } = require('./redis-store');
+async function createRedisStore(config: EnvConfig, logger: Logger): Promise<SessionStore> {
+  const { RedisStore } = await import('./redis-store');
   return new RedisStore(config, logger);
 }
