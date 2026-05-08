@@ -48,6 +48,7 @@ export async function createBaileysClient(
       auth: authProvider.state as any,
       printQRInTerminal: true,
       logger: {
+        trace: (...args: any[]) => logger.debug(formatBaileysArg(args[0]), { source: 'baileys' }),
         info: (...args: any[]) => logger.info(formatBaileysArg(args[0]), { source: 'baileys' }),
         warn: (...args: any[]) => logger.warn(formatBaileysArg(args[0]), { source: 'baileys' }),
         error: (...args: any[]) => logger.error(formatBaileysArg(args[0]), { source: 'baileys' }),
