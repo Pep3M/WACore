@@ -17,7 +17,9 @@
   },
   "dependencies": {
     "baileys": "^7.0.0-rc10",
+    "drizzle-orm": "^0.45.2",
     "ioredis": "^5.10.1",
+    "postgres": "^3.4.9",
     "qrcode-terminal": "^0.12.0"
   }
 }
