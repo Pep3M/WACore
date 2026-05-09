@@ -325,7 +325,7 @@ Para integraciones locales (mismo proceso), el paso 7-9 se salta: el consumidor 
 ### 7.1 Dockerfile
 
 Multi-stage: 
-- Stage 1: Instalar dependencias con bun install --frozen-lockfile
+- Stage 1: Instalar dependencias con bun install
 - Stage 2: Copiar solo lo necesario para runtime
 - Usuario no-root (bun)
 - HEALTHCHECK con curl a /health

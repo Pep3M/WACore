@@ -1,0 +1,88 @@
+# ============================================================
+# WACore - Entorno de desarrollo completo (back + front + infra)
+# ============================================================
+# Uso:
+#   docker compose -f docker-compose.dev.yml up -d
+#   Abrir http://localhost:5173
+# ============================================================
+
+services:
+  # --- WhatsApp Backend ---
+  wacore:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wacore
+    command: bun run --watch src/index.ts
+    volumes:
+      - ./src:/app/src
+      - ./migrations:/app/migrations
+    ports:
+      - "9878:9878"
+      - "9877:9877"
+    environment:
+      - WA_INSTANCE_NAME=bot-dev
+      - HEALTH_PORT=9877
+      - API_PORT=9878
+      - LOG_LEVEL=debug
+      - SESSION_STORE=postgres
+      - DATABASE_URL=postgres://wacore:wacore@postgres:5432/wacore
+      - CONNECT_ON_STARTUP=true
+      - API_KEY=${API_KEY:-dev-api-key-123}
+      - NODE_ENV=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # --- React Frontend ---
+  front:
+    build:
+      context: ./front
+      dockerfile: Dockerfile.dev
+    container_name: wacore-front
+    environment:
+      - VITE_API_KEY=${API_KEY:-dev-api-key-123}
+      - VITE_API_URL=
+      - VITE_PROXY_TARGET=http://wacore:9878
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./front/src:/app/src
+      - ./front/index.html:/app/index.html
+    depends_on:
+      - wacore
+    restart: unless-stopped
+
+  # --- PostgreSQL ---
+  postgres:
+    image: postgres:16-alpine
+    container_name: wacore-postgres
+    environment:
+      POSTGRES_USER: wacore
+      POSTGRES_PASSWORD: wacore
+      POSTGRES_DB: wacore
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wacore"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- Redis ---
+  redis:
+    image: redis:7-alpine
+    container_name: wacore-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pg_data:

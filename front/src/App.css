@@ -1,0 +1,394 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface2: #334155;
+  --border: #475569;
+  --text: #f1f5f9;
+  --text2: #94a3b8;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --radius: 8px;
+  --font: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.app-header {
+  margin-bottom: 16px;
+}
+
+.app-header h1 {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.subtitle {
+  color: var(--text2);
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-header h2 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text2);
+}
+
+/* ─── Connection Panel ─── */
+
+.connection-panel {
+  margin-bottom: 16px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.conn-form {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.conn-form input {
+  flex: 1;
+  min-width: 180px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.8rem;
+}
+
+.conn-info {
+  display: flex;
+  gap: 24px;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  color: var(--text2);
+}
+
+.conn-info strong {
+  color: var(--text);
+}
+
+.conn-actions {
+  padding: 8px 14px;
+}
+
+.qr-section {
+  padding: 14px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+.qr-hint {
+  font-size: 0.75rem;
+  color: var(--text2);
+  margin-bottom: 10px;
+}
+
+.qr-img {
+  display: inline-block;
+  border-radius: 4px;
+  background: #fff;
+  padding: 8px;
+}
+
+.qr-placeholder {
+  padding: 40px;
+  color: var(--text2);
+  font-size: 0.8rem;
+}
+
+/* ─── Main Grid ─── */
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr 300px;
+  gap: 16px;
+  min-height: 60vh;
+}
+
+@media (max-width: 1000px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Contact List ─── */
+
+.contact-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.contact-item:hover {
+  background: var(--surface2);
+}
+
+.contact-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.contact-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contact-phone {
+  font-size: 0.7rem;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Messages ─── */
+
+.message-list {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.empty-state {
+  padding: 40px 14px;
+  text-align: center;
+  color: var(--text2);
+  font-size: 0.8rem;
+}
+
+.msg-entry {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.msg-entry:hover {
+  background: var(--surface2);
+}
+
+.msg-entry.incoming {
+  border-left: 3px solid var(--primary);
+}
+
+.msg-entry.outgoing {
+  border-left: 3px solid var(--success);
+}
+
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: var(--text2);
+  margin-bottom: 2px;
+}
+
+.msg-direction {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.msg-sender {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.msg-phone {
+  color: var(--text2);
+}
+
+.msg-time {
+  margin-left: auto;
+}
+
+.msg-body {
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
+.echo-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.echo-toggle input {
+  accent-color: var(--primary);
+}
+
+/* ─── Send Message ─── */
+
+.send-form {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.send-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text2);
+}
+
+.send-form input,
+.send-form textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.send-form input:focus,
+.send-form textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.form-error {
+  color: var(--danger);
+  font-size: 0.75rem;
+}
+
+/* ─── Buttons ─── */
+
+button {
+  font-family: var(--font);
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface2);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button:hover {
+  background: var(--border);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn-danger:hover {
+  background: var(--danger-hover);
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+}

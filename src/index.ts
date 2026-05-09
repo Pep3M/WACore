@@ -59,6 +59,8 @@ async function main(): Promise<void> {
     () => client.getConnectionStatus(),
     () => client.getQr(),
     () => client.logout(),
+    () => client.getContacts(),
+    () => client.connect(),
     incomingHub,
     sseTransport,
   );

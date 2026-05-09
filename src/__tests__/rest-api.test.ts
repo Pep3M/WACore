@@ -24,6 +24,8 @@ describe('RestApi', () => {
     () => 'connected',
     () => 'qr-data',
     async () => {},
+    () => [],
+    async () => {},
   );
 
   afterAll(() => {
@@ -89,7 +91,8 @@ describe('RestApi polling and SSE', () => {
   it('GET /api/messages returns 404 when polling is disabled', async () => {
     const disabledConfig = { ...mockConfig, pollingEnabled: false, apiKey: 'no-poll-key' };
     const noPollApi = createRestApi(9883, disabledConfig, logger,
-      async () => '', async () => '', () => 'connected', () => null, async () => {});
+      async () => '', async () => '', () => 'connected', () => null, async () => {},
+      () => [], async () => {});
     noPollApi.start();
 
     const res = await fetch('http://localhost:9883/api/messages', {
@@ -114,6 +117,8 @@ describe('RestApi polling and SSE', () => {
       async (req) => `media-${req.to}`,
       () => 'connected',
       () => 'qr-data',
+      async () => {},
+      () => [],
       async () => {},
       hub,
       sseTransportTest,
@@ -165,6 +170,8 @@ describe('RestApi polling and SSE', () => {
       () => 'connected',
       () => 'qr-data',
       async () => {},
+      () => [],
+      async () => {},
       hub,
       sseTransportTest,
     );
@@ -185,7 +192,8 @@ describe('RestApi polling and SSE', () => {
   it('GET /api/messages/stream returns 404 when SSE disabled', async () => {
     const disabledConfig = { ...mockConfig, sseEnabled: false, apiKey: 'no-sse-key-2' };
     const noSseApi = createRestApi(9887, disabledConfig, logger,
-      async () => '', async () => '', () => 'connected', () => null, async () => {});
+      async () => '', async () => '', () => 'connected', () => null, async () => {},
+      () => [], async () => {});
     noSseApi.start();
 
     const res = await fetch('http://localhost:9887/api/messages/stream', {
@@ -209,7 +217,8 @@ describe('RestApi disabled', () => {
   it('returns no-op when no API_KEY', () => {
     const disabledConfig = { ...mockConfig, apiKey: undefined };
     const api = createRestApi(9881, disabledConfig, logger,
-      async () => '', async () => '', () => 'connected', () => null, async () => {});
+      async () => '', async () => '', () => 'connected', () => null, async () => {},
+      () => [], async () => {});
     expect(() => api.start()).not.toThrow();
     expect(() => api.stop()).not.toThrow();
   });

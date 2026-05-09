@@ -17,6 +17,8 @@ export function createRestApi(
   getConnectionStatus: () => string,
   getQr: () => string | null,
   logout: () => Promise<void>,
+  getContacts: () => Array<{ phone: string; name: string }>,
+  connect: () => Promise<void>,
   incomingHub?: IncomingMessageHub,
   sseTransport?: SSETransport,
 ): RestApi {
@@ -29,15 +31,23 @@ export function createRestApi(
 
   let server: ReturnType<typeof Bun.serve> | null = null;
 
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+
   function authenticate(req: Request): boolean {
     const auth = req.headers.get('Authorization');
-    return auth === `Bearer ${config.apiKey}`;
+    if (auth === `Bearer ${config.apiKey}`) return true;
+    const url = new URL(req.url);
+    return url.searchParams.get('api_key') === config.apiKey;
   }
 
   function jsonResponse<T>(data: ApiResponse<T>, status = 200): Response {
     return new Response(JSON.stringify(data), {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 
@@ -110,11 +120,33 @@ export function createRestApi(
     return jsonResponse({ success: true, data: result });
   }
 
+  function handleGetContacts(): Response {
+    try {
+      const contacts = getContacts();
+      return jsonResponse({ success: true, data: { contacts } });
+    } catch (err) {
+      return jsonResponse({ success: false, error: String(err) }, 500);
+    }
+  }
+
+  async function handlePostConnect(): Promise<Response> {
+    try {
+      await connect();
+      return jsonResponse({ success: true, data: { connecting: true } });
+    } catch (err) {
+      return jsonResponse({ success: false, error: String(err) }, 500);
+    }
+  }
+
   return {
     start() {
       server = Bun.serve({
         port,
         fetch: async (req) => {
+          if (req.method === 'OPTIONS') {
+            return new Response(null, { status: 204, headers: corsHeaders });
+          }
+
           if (!authenticate(req)) {
             return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
           }
@@ -128,6 +160,8 @@ export function createRestApi(
           if (method === 'GET' && url.pathname === '/api/qr') return handleGetQr();
           if (method === 'DELETE' && url.pathname === '/api/session') return handleDeleteSession();
           if (method === 'GET' && url.pathname === '/api/messages') return handleGetMessages(req);
+          if (method === 'GET' && url.pathname === '/api/contacts') return handleGetContacts();
+          if (method === 'POST' && url.pathname === '/api/connect') return handlePostConnect();
           if (method === 'GET' && url.pathname === '/api/messages/stream') {
             if (!sseTransport) {
               return jsonResponse({ success: false, error: 'SSE not enabled' }, 404);

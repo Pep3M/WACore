@@ -12,14 +12,22 @@ import type { SessionStore } from '../storage/session-store';
 import type { EnvConfig, ConnectionStatus } from '../types';
 import { createReconnectionManager } from '../core/reconnection';
 
+export interface Contact {
+  phone: string;
+  name: string;
+  jid: string;
+}
+
 export interface BaileysClient {
   socket: WASocket | null;
   start(): Promise<void>;
   stop(): Promise<void>;
+  connect(): Promise<void>;
   sendMessage(jid: string, content: any): Promise<any>;
   getConnectionStatus(): ConnectionStatus;
   getQr(): string | null;
   logout(): Promise<void>;
+  getContacts(): Contact[];
 }
 
 export async function createBaileysClient(
@@ -33,6 +41,7 @@ export async function createBaileysClient(
   let connectionStatus: ConnectionStatus = 'disconnected';
   let currentQr: string | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  const contacts = new Map<string, Contact>();
 
   const reconnection = createReconnectionManager(eventBus, logger);
 
@@ -130,12 +139,35 @@ export async function createBaileysClient(
       }
     });
 
+    sock.ev.on('contacts.upsert', (upserted: any[]) => {
+      for (const c of upserted) {
+        if (c.id && c.notify) {
+          const phone = c.id.split('@')[0];
+          contacts.set(phone, { phone, name: c.notify || c.name || c.verifiedName || phone, jid: c.id });
+        }
+      }
+    });
+
     sock.ev.on('creds.update', async () => {
       await authProvider.saveCreds();
     });
 
     sock.ev.on('messages.upsert', async (msgEvent) => {
       for (const msg of msgEvent.messages) {
+        const jid = msg.key.remoteJid;
+        if (jid && !jid.includes('@g.us') && !jid.includes('@broadcast')) {
+          const phone = jid.split('@')[0] ?? '';
+          if (!phone) continue;
+          const pushName = msg.pushName || phone;
+          if (!contacts.has(phone)) {
+            contacts.set(phone, { phone, name: pushName, jid });
+          } else {
+            const existing = contacts.get(phone)!;
+            if (pushName !== phone && existing.name === existing.phone) {
+              existing.name = pushName;
+            }
+          }
+        }
         eventBus.emit('message', msg as any);
       }
     });
@@ -149,6 +181,22 @@ export async function createBaileysClient(
 
     async start() {
       logger.info('Starting Baileys client', { instance: config.instanceName });
+      socket = buildSocket();
+    },
+
+    async connect() {
+      if (socket) {
+        const status = connectionStatus;
+        if (status === 'connected' || status === 'connecting' || status === 'awaiting-qr') {
+          logger.info('Already connecting/connected, skipping connect()', { status });
+          return;
+        }
+      }
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (connectionStatus === 'logged-out') {
+        logger.info('Resetting auth state for reconnection');
+        authProvider.reset();
+      }
       socket = buildSocket();
     },
 
@@ -172,6 +220,8 @@ export async function createBaileysClient(
     getConnectionStatus: () => connectionStatus,
 
     getQr: () => currentQr,
+
+    getContacts: () => Array.from(contacts.values()),
 
     async logout() {
       if (socket) {

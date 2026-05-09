@@ -17,12 +17,14 @@ export interface AuthState {
     get: (type: string, ids: string[]) => Promise<Record<string, unknown>>;
     set: (data: Record<string, unknown>) => Promise<void>;
   };
+  _keyData?: Record<string, unknown>;
 }
 
 export interface AuthProvider {
   state: AuthState & { save: () => Promise<void> };
   saveCreds: () => Promise<void>;
   invalidate: () => void;
+  reset: () => void;
 }
 
 function hydrate<T>(data: T): T {
@@ -81,6 +83,8 @@ async function buildState(sessionStore: SessionStore, logger: Logger): Promise<A
       enqueueSave();
       await persistQueue;
     },
+
+    _keyData: keyData,
   };
 }
 
@@ -102,6 +106,17 @@ export async function createAuthProvider(
 
     invalidate() {
       valid = false;
+    },
+
+    reset() {
+      valid = true;
+      const fresh = initAuthCreds() as unknown as Record<string, unknown>;
+      Object.keys(state.creds).forEach(k => delete state.creds[k]);
+      Object.assign(state.creds, fresh);
+      const keyData = state._keyData;
+      if (keyData) {
+        Object.keys(keyData).forEach(k => delete keyData[k]);
+      }
     },
 
     async saveCreds() {

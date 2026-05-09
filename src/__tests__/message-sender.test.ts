@@ -25,6 +25,8 @@ function createMockClient(): BaileysClient {
     getConnectionStatus: mock(() => 'connected' as const),
     getQr: mock(() => null),
     logout: mock(async () => {}),
+    connect: mock(async () => {}),
+    getContacts: mock(() => []),
   };
 }
 

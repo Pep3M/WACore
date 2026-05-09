@@ -89,7 +89,7 @@ Además, `grep 'drizzle-orm' bun.lock` no devuelve resultados, lo que sugiere qu
 El `Dockerfile` ejecuta en la etapa `deps`:
 
 ```dockerfile
-RUN bun install --frozen-lockfile --production --verbose
+RUN bun install --production --verbose
 ```
 
 Con `--production`, Bun solo instala las dependencias listadas en `dependencies` de `package.json`. Como `drizzle-orm` y `postgres` no están ahí, **no se instalarán en la imagen Docker**. En runtime, cuando `SESSION_STORE=postgres`, el import dinámico de `postgres-db.ts` fallará con un `MODULE_NOT_FOUND`.
