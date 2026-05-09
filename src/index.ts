@@ -37,7 +37,7 @@ async function main(): Promise<void> {
   const eventBus = createEventBus();
   const sessionStore = await createSessionStore(config, logger);
   const authProvider = await createAuthProvider(sessionStore, logger);
-  const client = await createBaileysClient(config, eventBus, authProvider, logger);
+  const client = await createBaileysClient(config, eventBus, authProvider, sessionStore, logger);
   const messageSender = createMessageSender(client, eventBus, logger);
   const healthMonitor = createHealthMonitor(config.healthPort, logger, config.instanceName);
   const messageRouter = createMessageRouter(eventBus, logger);

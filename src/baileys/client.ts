@@ -8,6 +8,7 @@ import {
 import type { Logger } from '../utils/logger';
 import type { EventBus } from '../core/event-bus';
 import type { AuthProvider } from './auth';
+import type { SessionStore } from '../storage/session-store';
 import type { EnvConfig, ConnectionStatus } from '../types';
 import { createReconnectionManager } from '../core/reconnection';
 
@@ -25,6 +26,7 @@ export async function createBaileysClient(
   config: EnvConfig,
   eventBus: EventBus,
   authProvider: AuthProvider,
+  sessionStore: SessionStore,
   logger: Logger,
 ): Promise<BaileysClient> {
   let socket: WASocket | null = null;
@@ -104,12 +106,13 @@ export async function createBaileysClient(
         });
 
         if (!reconnection.shouldReconnect(reason)) {
+          socket = null;
+          await sessionStore.delete();
           updateStatus('logged-out');
           eventBus.emit('auth.logged-out', {
             reason: String(reason),
             willReconnect: false,
           });
-          await authProvider.saveCreds();
           return;
         }
 
@@ -151,8 +154,8 @@ export async function createBaileysClient(
     async stop() {
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (socket) {
-        socket?.logout?.();
-        socket?.ws?.close?.();
+        try { socket?.logout?.(); } catch {}
+        try { socket?.ws?.close?.(); } catch {}
         socket = null;
       }
       updateStatus('disconnected');
@@ -171,9 +174,14 @@ export async function createBaileysClient(
 
     async logout() {
       if (socket) {
-        await socket.logout();
+        try {
+          await socket.logout();
+        } catch (err) {
+          logger.warn('Error during socket.logout(), cleaning up session anyway', { error: String(err) });
+        }
         socket = null;
       }
+      await sessionStore.delete();
       updateStatus('logged-out');
     },
   };

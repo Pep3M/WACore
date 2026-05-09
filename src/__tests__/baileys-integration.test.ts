@@ -86,7 +86,7 @@ describe('Baileys Integration - Message Pipeline', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const router = createMessageRouter(bus, logger);
@@ -121,7 +121,7 @@ describe('Baileys Integration - Message Pipeline', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const router = createMessageRouter(bus, logger);
@@ -165,7 +165,7 @@ describe('Baileys Integration - Message Pipeline', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const router = createMessageRouter(bus, logger);
@@ -194,7 +194,7 @@ describe('Baileys Integration - Message Pipeline', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const router = createMessageRouter(bus, logger);
@@ -223,7 +223,7 @@ describe('Baileys Integration - Message Pipeline', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const router = createMessageRouter(bus, logger);
@@ -258,7 +258,7 @@ describe('Baileys Integration - Client + Auth + Session Store', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
 
     expect(client.getConnectionStatus()).toBe('disconnected');
   });
@@ -269,7 +269,7 @@ describe('Baileys Integration - Client + Auth + Session Store', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
 
     await client.start();
     expect(client.getConnectionStatus()).toBe('connecting');
@@ -332,7 +332,7 @@ describe('Baileys Integration - Client + Auth + Session Store', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const qrHandler = mock();
@@ -354,7 +354,7 @@ describe('Baileys Integration - Client + Auth + Session Store', () => {
     const authProvider = await createAuthProvider(store, logger);
     authProvider.state.creds = { registrationId: 77 };
 
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     await authProvider.saveCreds();
@@ -375,7 +375,7 @@ describe('Baileys Integration - Message Sending', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
 
     await client.start();
 
@@ -398,7 +398,7 @@ describe('Baileys Integration - Message Sending', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const sender = createMessageSender(client, bus, logger);
@@ -419,7 +419,7 @@ describe('Baileys Integration - Message Sending', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const sender = createMessageSender(client, bus, logger);
@@ -461,7 +461,7 @@ describe('Baileys Integration - Message Sending', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const sender = createMessageSender(client, bus, logger);
@@ -570,7 +570,7 @@ describe('Baileys Integration - Message Router Edge Cases', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const router = createMessageRouter(bus, logger);
@@ -610,7 +610,7 @@ describe('Baileys Integration - Message Router Edge Cases', () => {
     const bus = createEventBus();
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
-    const client = await createBaileysClient(testConfig, bus, authProvider, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
     await client.start();
 
     const router = createMessageRouter(bus, logger);
