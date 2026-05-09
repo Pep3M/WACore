@@ -11,7 +11,7 @@ export function loadConfig(): EnvConfig {
     healthPort: parseInt(Bun.env.HEALTH_PORT || '9877', 10),
     apiPort: parseInt(Bun.env.API_PORT || '9878', 10),
     logLevel: (Bun.env.LOG_LEVEL as EnvConfig['logLevel']) || 'info',
-    sessionStore: (Bun.env.SESSION_STORE as EnvConfig['sessionStore']) || 'file',
+    sessionStore: (Bun.env.SESSION_STORE as EnvConfig['sessionStore']) || 'postgres',
     sessionDir: Bun.env.SESSION_DIR || '/data/sessions',
     databaseUrl: Bun.env.DATABASE_URL,
     redisUrl: Bun.env.REDIS_URL,

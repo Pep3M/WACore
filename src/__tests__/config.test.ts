@@ -56,8 +56,7 @@ describe('loadConfig', () => {
     expect(config.healthPort).toBe(9877);
     expect(config.apiPort).toBe(9878);
     expect(config.logLevel).toBe('info');
-    expect(config.sessionStore).toBe('file');
-    expect(config.sessionDir).toBe('/data/sessions');
+    expect(config.sessionStore).toBe('postgres');
     expect(config.connectOnStartup).toBe(true);
     expect(config.qrTimeout).toBe(60000);
     expect(config.nodeEnv).toBe('production');

@@ -22,6 +22,7 @@ export interface AuthState {
 export interface AuthProvider {
   state: AuthState & { save: () => Promise<void> };
   saveCreds: () => Promise<void>;
+  invalidate: () => void;
 }
 
 function hydrate<T>(data: T): T {
@@ -89,6 +90,7 @@ export async function createAuthProvider(
 ): Promise<AuthProvider> {
   const state = await buildState(sessionStore, logger);
   let saveScheduled = false;
+  let valid = true;
 
   async function persist(): Promise<void> {
     const allKeys = await state.keys.get('', []);
@@ -98,8 +100,12 @@ export async function createAuthProvider(
   return {
     state,
 
+    invalidate() {
+      valid = false;
+    },
+
     async saveCreds() {
-      if (saveScheduled) return;
+      if (!valid || saveScheduled) return;
       saveScheduled = true;
 
       await Promise.resolve();

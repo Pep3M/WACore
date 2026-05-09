@@ -60,6 +60,7 @@ backlog → designing → planned → implementing → testing → done
 | `tasks.md` | Tracker de features con estados |
 | `current.md` | Bitácora en tiempo real de la sesión actual |
 | `history.md` | Historial de sesiones cerradas (append-only) |
+| `versions.md` | Registro de versiones publicadas (tags Docker) |
 
 ## Convenciones de código
 
@@ -67,3 +68,42 @@ backlog → designing → planned → implementing → testing → done
 - kebab-case para nombres de archivo
 - Tests con `bun:test`
 - Variables de entorno en `.env.example`
+
+## Versionado y releases
+
+WACore usa [SemVer](https://semver.org/) estricto: `v<major>.<minor>.<patch>`.
+
+| Tipo | Cuándo | Ejemplo |
+|------|--------|---------|
+| **patch** | Bugs, refactors, cambios menores **(default)** | `v0.1.0` → `v0.1.1` |
+| **minor** | Nuevas features, cambios no rompientes | `v0.1.0` → `v0.2.0` |
+| **major** | Breaking changes, rewrites | `v0.1.0` → `v1.0.0` |
+
+### Flujo para desplegar una nueva versión
+
+Ya no se despliega con un simple push a `master`. El flujo correcto es:
+
+1. **Determinar el tag que toca**
+   - Leer `progress/versions.md` para ver la última versión.
+   - Por defecto incrementar **patch** (`v0.1.0` → `v0.1.1`).
+   - Si el usuario pide explícitamente "nueva feature" o "breaking change", usar minor o major respectivamente.
+
+2. **Actualizar `CHANGELOG.md`**
+   - Mover los features completados de `[Unreleased]` a la nueva versión.
+   - Describir los cambios que incluye este release.
+
+3. **Actualizar `progress/versions.md`**
+   - Añadir la entrada de la nueva versión con fecha y features incluidas.
+
+4. **Actualizar `package.json`**
+   - Cambiar el campo `version` al nuevo número.
+
+5. **Crear y pushear el tag**
+   ```bash
+   git add CHANGELOG.md progress/versions.md package.json
+   git commit -m "release: v0.1.1"
+   git tag v0.1.1
+   git push origin master --tags
+   ```
+
+6. **El CI (`docker-build.yml`) detecta el tag `v*.*.*`** y genera automáticamente la imagen Docker con tag `v0.1.1` (además de `latest`).

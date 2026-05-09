@@ -10,6 +10,7 @@ Sistema de trazabilidad para seguir el progreso de features desde requisitos has
 | `tasks.md` | Tracker de features con estado, responsables, y fase |
 | `current.md` | Bitácora en tiempo real de la sesión actual |
 | `history.md` | Historial de sesiones cerradas (append-only) |
+| `versions.md` | Registro de versiones publicadas (tags Docker) |
 | `design-{feature}.md` | Documento de diseño de arquitectura |
 | `impl-{feature}.md` | Reporte de implementación |
 | `review-{feature}.md` | Resultado de revisión de QA |

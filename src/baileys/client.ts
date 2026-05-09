@@ -107,6 +107,7 @@ export async function createBaileysClient(
 
         if (!reconnection.shouldReconnect(reason)) {
           socket = null;
+          authProvider.invalidate();
           await sessionStore.delete();
           updateStatus('logged-out');
           eventBus.emit('auth.logged-out', {
@@ -181,6 +182,7 @@ export async function createBaileysClient(
         }
         socket = null;
       }
+      authProvider.invalidate();
       await sessionStore.delete();
       updateStatus('logged-out');
     },
