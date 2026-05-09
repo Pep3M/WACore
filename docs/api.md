@@ -11,10 +11,10 @@ WACore es un backend para WhatsApp basado en [Baileys](https://github.com/whiske
 - [Variables de entorno](#variables-de-entorno)
 - [Conexión a WhatsApp](#conexión-a-whatsapp)
 - [API REST](#api-rest)
+  - [Obtener QR](#get-apiqr--obtener-qr-en-texto)
   - [Enviar mensaje de texto](#post-apisend--enviar-mensaje-de-texto)
   - [Enviar multimedia](#post-apisend-media--enviar-multimedia)
   - [Estado de conexión](#get-apistatus--estado-de-conexión)
-  - [Obtener QR](#get-apiqr--obtener-qr-en-texto)
   - [Cerrar sesión](#delete-apisession--cerrar-sesión)
   - [Polling de mensajes entrantes](#get-apimessages--polling-de-mensajes-entrantes)
   - [SSE streaming](#get-apimessagesstream--sse-server-sent-events)
@@ -90,6 +90,12 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9877/health > /dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   postgres:
     image: postgres:16-alpine
@@ -216,6 +222,60 @@ Todas las peticiones requieren el header:
 Authorization: Bearer <API_KEY>
 ```
 
+### `GET /api/qr` — Obtener QR en texto
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/qr
+```
+
+```typescript
+// Response
+type QrResponse = {
+  success: true;
+  data: {
+    /** Raw QR string (ej: "1@abc123def456..."). No es un enlace.
+     *  Debe convertirse a imagen QR para escanearlo con WhatsApp. */
+    qr: string;
+  };
+};
+
+// Error — si ya hay conexión activa
+type QrErrorResponse = {
+  success: false;
+  error: {
+    code: "QR_NOT_AVAILABLE";
+    message: "Ya hay una conexión activa, no hay QR disponible";
+  };
+};
+```
+
+```json
+{
+  "success": true,
+  "data": { "qr": "1@abc123def456..." }
+}
+```
+
+> Retorna `404` si ya hay una conexión activa (no hay QR disponible).
+
+**Nota:** El string `qr` no es una URL ni un enlace. Es el contenido bruto que debe renderizarse como código QR. Para visualizarlo y escanearlo con WhatsApp puedes:
+
+- **Desde el frontend (JS/TS):** usar una librería como [`qrcode`](https://www.npmjs.com/package/qrcode) para generar una imagen:
+  ```ts
+  import QRCode from 'qrcode';
+
+  const res = await fetch('/api/qr', { headers: { Authorization } });
+  const { data } = await res.json();
+  const img = await QRCode.toDataURL(data.qr);
+  // <img src={img} /> para mostrar en navegador
+  ```
+- **Desde terminal:** con `qrcode-terminal` o convirtiendo manualmente:
+  ```bash
+  curl -s -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/qr \
+    | jq -r '.data.qr' | qrcode-terminal
+  ```
+- **Online:** pegar el string en generadores como [qrcodeserver.com](https://qrcodeserver.com) o [qr-code-generator.com](https://qr-code-generator.com).
+
 ### `POST /api/send` — Enviar mensaje de texto
 
 ```bash
@@ -276,21 +336,6 @@ curl -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/status
 ```
 
 Posibles valores de `status`: `connected`, `connecting`, `disconnected`, `awaiting-qr`, `logged-out`, `failed`.
-
-### `GET /api/qr` — Obtener QR en texto
-
-```bash
-curl -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/qr
-```
-
-```json
-{
-  "success": true,
-  "data": { "qr": "1@abc123def456..." }
-}
-```
-
-> Retorna `404` si ya hay una conexión activa (no hay QR disponible).
 
 ### `DELETE /api/session` — Cerrar sesión
 
