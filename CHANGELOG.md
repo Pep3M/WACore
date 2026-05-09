@@ -7,7 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.1.0] — Pendiente de taggear
+## [0.1.1] — 2026-05-08
+
+### Fixed
+- DELETE /api/session ahora retorna 200 con `loggedOut: true` incluso si el socket de WhatsApp está cerrado
+- Limpieza automática de sesión al recibir `loggedOut` desde Baileys (logout desde el móvil)
+- Eliminado race condition donde `creds.update` re-creaba la sesión tras borrarla
+
+### Changed
+- `SESSION_STORE` por defecto pasa a `postgres`
+
+## [0.1.0] — 2026-05-08
 
 ### Añadido
 - Conexión y autenticación WhatsApp vía Baileys (RF-01)
