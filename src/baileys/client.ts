@@ -41,6 +41,7 @@ export async function createBaileysClient(
   let connectionStatus: ConnectionStatus = 'disconnected';
   let currentQr: string | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let isStopping = false;
   const contacts = new Map<string, Contact>();
 
   const reconnection = createReconnectionManager(eventBus, logger);
@@ -105,6 +106,7 @@ export async function createBaileysClient(
       }
 
       if (connection === 'close') {
+        if (isStopping) return;
         const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
         const reason = mapDisconnectReason(statusCode);
 
@@ -153,7 +155,6 @@ export async function createBaileysClient(
     });
 
     sock.ev.on('messages.upsert', async (msgEvent) => {
-      logger.info('messages.upsert received', { count: msgEvent.messages.length, type: (msgEvent as any).type });
       for (const msg of msgEvent.messages) {
         const jid = msg.key.remoteJid;
         if (jid && !jid.includes('@g.us') && !jid.includes('@broadcast')) {
@@ -169,8 +170,27 @@ export async function createBaileysClient(
             }
           }
         }
-        eventBus.emit('message', msg as any);
-        logger.info('Emitted message event', { id: msg.key?.id, from: msg.key?.remoteJid });
+        if (msg.message) {
+          eventBus.emit('message', msg as any);
+        } else {
+          logger.info('messages.upsert skipped (no message, likely crypto retry)', { id: msg.key?.id, from: msg.key?.remoteJid, type: (msgEvent as any).type });
+        }
+      }
+    });
+
+    sock.ev.on('messages.update', (updates) => {
+      for (const { key, update } of updates) {
+        if (!update.message) continue;
+        const msg = { key, ...update } as any;
+        const jid = key.remoteJid;
+        if (jid && !jid.includes('@g.us') && !jid.includes('@broadcast')) {
+          const phone = jid.split('@')[0] ?? '';
+          if (phone && !contacts.has(phone)) {
+            contacts.set(phone, { phone, name: update.pushName || phone, jid });
+          }
+        }
+        eventBus.emit('message', msg);
+        logger.info('messages.update — decrypted after retry', { id: key.id, from: key.remoteJid });
       }
     });
 
@@ -204,13 +224,14 @@ export async function createBaileysClient(
 
     async stop() {
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      isStopping = true;
+
       if (socket) {
-        try { socket?.logout?.(); } catch {}
+        try { await authProvider.saveCreds(); } catch {}
         try { socket?.ws?.close?.(); } catch {}
         socket = null;
       }
       updateStatus('disconnected');
-      await authProvider.saveCreds();
       logger.info('Baileys client stopped');
     },
 

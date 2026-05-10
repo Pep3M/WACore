@@ -123,13 +123,12 @@ export async function createAuthProvider(
       if (!valid || saveScheduled) return;
       saveScheduled = true;
 
-      await Promise.resolve();
-      saveScheduled = false;
-
       try {
         await persist();
       } catch (err) {
         logger.error('Failed to save auth state', { error: String(err) });
+      } finally {
+        saveScheduled = false;
       }
     },
   };

@@ -18,8 +18,9 @@ export async function createSessionStore(config: EnvConfig, logger: Logger): Pro
     case 'postgres':
       return createPostgresStore(config, logger);
     default:
-      logger.warn(`Unknown session store "${config.sessionStore}", falling back to file`);
-      return createFileStore(config, logger);
+      throw new Error(
+        `Unknown session store "${config.sessionStore}". Supported values: postgres, redis`,
+      );
     }
 }
 
