@@ -60,17 +60,43 @@ async function buildState(sessionStore: SessionStore, logger: Logger): Promise<A
   const keys = {
     async get(type: string, ids: string[]): Promise<Record<string, unknown>> {
       if (ids.length === 0) return keyData;
+
       const result: Record<string, unknown> = {};
+
+      // baileys stores types as { [type]: { [id]: value } }
+      // e.g. 'pre-key': { 968: keyPair, 969: keyPair }
+      // e.g. 'session': { jid: sessionData }
+      const typeData = keyData[type];
+      if (typeof typeData === 'object' && typeData !== null) {
+        for (const id of ids) {
+          const val = (typeData as Record<string, unknown>)[id];
+          if (val !== undefined) {
+            result[id] = val;
+          }
+        }
+        if (Object.keys(result).length > 0) return result;
+      }
+
+      // Flat fallback for legacy or non-nested types
       for (const id of ids) {
         const key = `${type}-${id}`;
         if (key in keyData) result[id] = keyData[key];
         if (id in keyData) result[id] = keyData[id];
       }
+
       return result;
     },
 
     async set(data: Record<string, unknown>): Promise<void> {
-      Object.assign(keyData, data);
+      for (const [k, v] of Object.entries(data)) {
+        const existing = keyData[k];
+        if (typeof v === 'object' && v !== null && !Array.isArray(v) && typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
+          // Merge nested types (pre-key, session, tctoken, etc.) instead of replacing
+          Object.assign(existing, v);
+        } else {
+          keyData[k] = v;
+        }
+      }
     },
   };
 
