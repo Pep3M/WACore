@@ -212,6 +212,37 @@ Si no se usó `CONNECT_ON_STARTUP=true` o se perdió la sesión:
 curl -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/qr
 ```
 
+### Manejo del QR desde un frontend
+
+El QR de WhatsApp **se regenera periódicamente** (~cada 20 segundos) hasta que el usuario lo escanea. Si el frontend se queda con el primer QR, este quedará obsoleto y el escaneo fallará.
+
+**Flujo correcto:**
+
+1. Consultar `GET /api/status` hasta que `status` sea `awaiting-qr`.
+2. Iniciar un **polling cada 3-5 segundos** a `GET /api/qr` para obtener el QR vigente.
+3. Renderizar el QR y permitir que el usuario lo escanee.
+4. Cuando el usuario escanea, el status cambia a `connected`.
+5. Detener el polling al salir del estado `awaiting-qr`.
+
+```typescript
+// Ejemplo: polling de QR en React
+useEffect(() => {
+  if (status !== 'awaiting-qr') {
+    setQr(null);
+    return;
+  }
+  const fetchQr = () =>
+    fetch('/api/qr', { headers: { Authorization } })
+      .then(r => r.json())
+      .then(r => { if (r.success) setQr(r.data.qr); });
+  fetchQr();
+  const id = setInterval(fetchQr, 5000);
+  return () => clearInterval(id);
+}, [status]);
+```
+
+**Evento SSE `connection`:** el backend también notifica cambios de estado via SSE. Cuando el frontend recibe un evento `connection` con `status: "awaiting-qr"`, debe disparar el polling de QR. Al recibir `status: "connected"`, debe detenerlo y limpiar el QR.
+
 ---
 
 ## API REST

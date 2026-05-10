@@ -154,14 +154,21 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (status === 'awaiting-qr') {
-      fetch(apiUrl + '/api/qr?api_key=' + encodeURIComponent(apiKey || getApiConfig().key))
-        .then(r => r.json())
-        .then(r => { if (r.success && r.data) setQrRaw(r.data.qr); else setQrRaw(null); });
-    } else {
+    if (status !== 'awaiting-qr') {
       setQrRaw(null);
+      return;
     }
-  }, [status]);
+    const key = apiKey || getApiConfig().key;
+    const base = apiUrl || getApiConfig().url;
+    const url = base + '/api/qr?api_key=' + encodeURIComponent(key);
+    const poll = () =>
+      fetch(url).then(r => r.json()).then(r => {
+        if (r.success && r.data) setQrRaw(r.data.qr);
+      }).catch(() => {});
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => clearInterval(id);
+  }, [status, apiUrl, apiKey]);
 
   const sseLabel = sseStatus === 'connected' ? 'SSE ✓' : sseStatus === 'connecting' ? 'SSE conectando...' : 'SSE error';
   const sseColor = sseStatus === 'connected' ? '#22c55e' : sseStatus === 'connecting' ? '#f59e0b' : '#ef4444';
