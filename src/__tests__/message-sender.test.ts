@@ -27,6 +27,7 @@ function createMockClient(): BaileysClient {
     logout: mock(async () => {}),
     connect: mock(async () => {}),
     getContacts: mock(() => []),
+    uploadPreKeysToServerIfRequired: mock(async () => {}),
   };
 }
 

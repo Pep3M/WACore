@@ -5,6 +5,7 @@ WORKDIR /app
 RUN apk add --no-cache curl git
 
 COPY package.json ./
+COPY scripts/ ./scripts/
 RUN npm install --omit=dev && apk del git
 
 COPY tsconfig.json ./

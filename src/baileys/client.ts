@@ -28,6 +28,7 @@ export interface BaileysClient {
   getQr(): string | null;
   logout(): Promise<void>;
   getContacts(): Contact[];
+  uploadPreKeysToServerIfRequired(): Promise<void>;
 }
 
 export async function createBaileysClient(
@@ -41,6 +42,7 @@ export async function createBaileysClient(
   let connectionStatus: ConnectionStatus = 'disconnected';
   let currentQr: string | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let preKeyTimer: ReturnType<typeof setInterval> | null = null;
   let isStopping = false;
   const contacts = new Map<string, Contact>();
 
@@ -102,6 +104,7 @@ export async function createBaileysClient(
         const phone = sock.user?.id ? sock.user.id.split(':')[0] : undefined;
         reconnection.reset();
         updateStatus('connected', phone);
+        sock.uploadPreKeysToServerIfRequired?.().catch(err => logger.warn('Pre-key upload failed on connect', { error: String(err) }));
         logger.info('WhatsApp connected', { phone });
       }
 
@@ -204,6 +207,13 @@ export async function createBaileysClient(
     async start() {
       logger.info('Starting Baileys client', { instance: config.instanceName });
       socket = buildSocket();
+      preKeyTimer = setInterval(async () => {
+        try {
+          await socket?.uploadPreKeysToServerIfRequired?.();
+        } catch (err) {
+          logger.warn('Periodic pre-key upload failed', { error: String(err) });
+        }
+      }, 30 * 60 * 1000);
     },
 
     async connect() {
@@ -224,6 +234,7 @@ export async function createBaileysClient(
 
     async stop() {
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (preKeyTimer) clearInterval(preKeyTimer);
       isStopping = true;
 
       if (socket) {
@@ -245,6 +256,14 @@ export async function createBaileysClient(
     getQr: () => currentQr,
 
     getContacts: () => Array.from(contacts.values()),
+
+    async uploadPreKeysToServerIfRequired() {
+      try {
+        await socket?.uploadPreKeysToServerIfRequired?.();
+      } catch (err) {
+        logger.warn('Pre-key upload failed', { error: String(err) });
+      }
+    },
 
     async logout() {
       if (socket) {
