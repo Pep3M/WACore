@@ -16,10 +16,15 @@ export function createMessageSender(
   return {
     async sendText(to: string, text: string): Promise<string> {
       const jid = to.includes('@') ? to : `${to}@s.whatsapp.net`;
-      const result = await client.sendMessage(jid, { text });
-      const messageId = result?.key?.id ?? 'unknown';
-      logger.debug('Message sent', { to: jid, messageId });
-      return messageId;
+      try {
+        const result = await client.sendMessage(jid, { text });
+        const messageId = result?.key?.id ?? 'unknown';
+        logger.debug('Message sent', { to: jid, messageId });
+        return messageId;
+      } catch (err) {
+        logger.error('Failed to send text message', { to: jid, error: String(err) });
+        throw err;
+      }
     },
 
     async sendMedia(req: SendMediaRequest): Promise<string> {
@@ -44,10 +49,15 @@ export function createMessageSender(
           throw new Error(`Unsupported media type: ${req.type}`);
       }
 
-      const result = await client.sendMessage(jid, content);
-      const messageId = result?.key?.id ?? 'unknown';
-      logger.debug('Media sent', { to: jid, type: req.type, messageId });
-      return messageId;
+      try {
+        const result = await client.sendMessage(jid, content);
+        const messageId = result?.key?.id ?? 'unknown';
+        logger.debug('Media sent', { to: jid, type: req.type, messageId });
+        return messageId;
+      } catch (err) {
+        logger.error('Failed to send media message', { to: jid, type: req.type, error: String(err) });
+        throw err;
+      }
     },
   };
 }

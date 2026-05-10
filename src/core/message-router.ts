@@ -20,6 +20,8 @@ const MESSAGE_EVENTS: Record<MessageType, WACoreEventName> = {
 export function createMessageRouter(eventBus: EventBus, logger: Logger): MessageRouter {
   function normalize(raw: any): NormalizedMessage | null {
     try {
+      if (raw.key?.fromMe) return null;
+
       const type = detectMessageType(raw);
       if (!type) return null;
 

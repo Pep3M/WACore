@@ -73,6 +73,14 @@ mock.module('baileys', () => ({
   makeWASocket: createMockSocketFactory(),
   DisconnectReason: {},
   useMultiFileAuthState: async () => ({ state: {}, saveCreds: async () => {} }),
+  isLidUser: (jid?: string) => !!jid?.endsWith('@lid'),
+  jidNormalizedUser: (jid: string) => {
+    const atIdx = jid.indexOf('@');
+    if (atIdx < 0) return jid;
+    const userPart = jid.slice(0, atIdx).split(':')[0].split('_')[0];
+    const server = jid.slice(atIdx + 1);
+    return `${userPart}@${server === 'c.us' ? 's.whatsapp.net' : server}`;
+  },
 }));
 
 describe('Baileys Integration - Message Pipeline', () => {

@@ -2,6 +2,8 @@ import {
   makeWASocket,
   DisconnectReason,
   useMultiFileAuthState,
+  isLidUser,
+  jidNormalizedUser,
   type WASocket,
   type UserFacingSocketConfig,
 } from 'baileys';
@@ -159,22 +161,40 @@ export async function createBaileysClient(
 
     sock.ev.on('messages.upsert', async (msgEvent) => {
       for (const msg of msgEvent.messages) {
-        const jid = msg.key.remoteJid;
-        if (jid && !jid.includes('@g.us') && !jid.includes('@broadcast')) {
+        if (msg.key?.fromMe) continue;
+
+        let jid = msg.key.remoteJid;
+        if (!jid) continue;
+
+        if (isLidUser(jid)) {
+          try {
+            const pnJid = await (sock as any).signalRepository?.lidMapping?.getPNForLID(jid);
+            if (pnJid) {
+              jid = jidNormalizedUser(pnJid);
+            }
+          } catch (err) {
+            logger.warn('Failed to resolve LID to PN', { jid, error: String(err) });
+          }
+        }
+
+        if (!jid.includes('@g.us') && !jid.includes('@broadcast')) {
           const phone = jid.split('@')[0] ?? '';
-          if (!phone) continue;
-          const pushName = msg.pushName || phone;
-          if (!contacts.has(phone)) {
-            contacts.set(phone, { phone, name: pushName, jid });
-          } else {
-            const existing = contacts.get(phone)!;
-            if (pushName !== phone && existing.name === existing.phone) {
-              existing.name = pushName;
+          if (phone) {
+            const pushName = msg.pushName || phone;
+            if (!contacts.has(phone)) {
+              contacts.set(phone, { phone, name: pushName, jid });
+            } else {
+              const existing = contacts.get(phone)!;
+              if (pushName !== phone && existing.name === existing.phone) {
+                existing.name = pushName;
+              }
             }
           }
         }
+
         if (msg.message) {
-          eventBus.emit('message', msg as any);
+          const emitted = Object.assign({}, msg, { key: { ...msg.key, remoteJid: jid } });
+          eventBus.emit('message', emitted as any);
         } else {
           logger.info('messages.upsert skipped (no message, likely crypto retry)', { id: msg.key?.id, from: msg.key?.remoteJid, type: (msgEvent as any).type });
         }
@@ -184,6 +204,7 @@ export async function createBaileysClient(
     sock.ev.on('messages.update', (updates) => {
       for (const { key, update } of updates) {
         if (!update.message) continue;
+        if (key?.fromMe) continue;
         const msg = { key, ...update } as any;
         const jid = key.remoteJid;
         if (jid && !jid.includes('@g.us') && !jid.includes('@broadcast')) {
