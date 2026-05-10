@@ -41,9 +41,9 @@ export function createLogger(config: EnvConfig): Logger {
 
     const output = JSON.stringify(entry);
     if (levelNum >= LEVEL_NUM.error) {
-      Bun.stderr.write(output + '\n');
+      process.stderr.write(output + '\n');
     } else {
-      Bun.stdout.write(output + '\n');
+      process.stdout.write(output + '\n');
     }
   }
 

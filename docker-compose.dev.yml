@@ -40,7 +40,7 @@ services:
       - VITE_API_URL=
       - VITE_PROXY_TARGET=http://wacore:9878
     ports:
-      - "5173:5173"
+      - "5175:5173"
     volumes:
       - ./front:/app
     depends_on:
@@ -55,7 +55,7 @@ services:
       POSTGRES_PASSWORD: wacore
       POSTGRES_DB: wacore
     ports:
-      - "5432:5432"
+      - "5444:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:

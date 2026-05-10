@@ -2,10 +2,10 @@ FROM node:22-alpine AS runtime
 
 WORKDIR /app
 
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl git
 
 COPY package.json ./
-RUN npm install --omit=dev
+RUN npm install --omit=dev && apk del git
 
 COPY tsconfig.json ./
 COPY src/ ./src/
