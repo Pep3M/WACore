@@ -1,22 +1,17 @@
 # ============================================================
 # WACore - Entorno de desarrollo completo (back + front + infra)
 # ============================================================
-# Uso:
-#   docker compose -f docker-compose.dev.yml up -d
-#   Abrir http://localhost:5173
-# ============================================================
-
 services:
-  # --- WhatsApp Backend ---
   wacore:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: wacore
-    command: bun run --watch src/index.ts
+    command: npx tsx watch src/index.ts
     volumes:
       - ./src:/app/src
       - ./migrations:/app/migrations
+      - ./node_modules:/app/node_modules
     ports:
       - "9878:9878"
       - "9877:9877"
@@ -35,12 +30,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # --- React Frontend ---
   front:
-    build:
-      context: ./front
-      dockerfile: Dockerfile.dev
+    image: oven/bun:1.2
     container_name: wacore-front
+    working_dir: /app
+    command: sh -c "bun install && bun run dev -- --host"
     environment:
       - VITE_API_KEY=${API_KEY:-dev-api-key-123}
       - VITE_API_URL=
@@ -48,13 +42,11 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      - ./front/src:/app/src
-      - ./front/index.html:/app/index.html
+      - ./front:/app
     depends_on:
       - wacore
     restart: unless-stopped
 
-  # --- PostgreSQL ---
   postgres:
     image: postgres:16-alpine
     container_name: wacore-postgres
@@ -72,7 +64,6 @@ services:
       timeout: 3s
       retries: 5
 
-  # --- Redis ---
   redis:
     image: redis:7-alpine
     container_name: wacore-redis

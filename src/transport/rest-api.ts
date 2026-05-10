@@ -1,3 +1,5 @@
+import type { Application, Request, Response, NextFunction } from 'express';
+import express from 'express';
 import type { Logger } from '../utils/logger';
 import type { EnvConfig, SendMessageRequest, SendMediaRequest, ApiResponse, PollMessagesResponse } from '../types';
 import type { IncomingMessageHub } from '../core/incoming-message-hub';
@@ -29,156 +31,140 @@ export function createRestApi(
     };
   }
 
-  let server: ReturnType<typeof Bun.serve> | null = null;
+  const app: Application = express();
+  let server: ReturnType<typeof app.listen> | null = null;
 
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
+  app.use(express.json());
+
+  app.use((_req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (_req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
 
   function authenticate(req: Request): boolean {
-    const auth = req.headers.get('Authorization');
+    const auth = req.headers['authorization'] || req.headers['Authorization'] as string;
     if (auth === `Bearer ${config.apiKey}`) return true;
-    const url = new URL(req.url);
-    return url.searchParams.get('api_key') === config.apiKey;
+    const apiKeyParam = typeof req.query.api_key === 'string' ? req.query.api_key : '';
+    return apiKeyParam === config.apiKey;
   }
 
-  function jsonResponse<T>(data: ApiResponse<T>, status = 200): Response {
-    return new Response(JSON.stringify(data), {
-      status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
-  }
+  app.use((req, res, next) => {
+    if (!authenticate(req)) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+    next();
+  });
 
-  async function handlePostSend(req: Request): Promise<Response> {
-    const body = await req.json() as SendMessageRequest;
+  app.post('/api/send', async (req: Request, res: Response) => {
+    const body = req.body as SendMessageRequest;
     if (!body.to || !body.text) {
-      return jsonResponse({ success: false, error: 'Missing required fields: to, text' }, 400);
+      res.status(400).json({ success: false, error: 'Missing required fields: to, text' });
+      return;
     }
     try {
       const id = await sendMessage(body.to, body.text);
-      return jsonResponse({ success: true, data: { id } });
+      res.json({ success: true, data: { id } });
     } catch (err) {
-      return jsonResponse({ success: false, error: String(err) }, 500);
+      res.status(500).json({ success: false, error: String(err) });
     }
-  }
+  });
 
-  async function handlePostSendMedia(req: Request): Promise<Response> {
-    const body = await req.json() as SendMediaRequest;
+  app.post('/api/send-media', async (req: Request, res: Response) => {
+    const body = req.body as SendMediaRequest;
     if (!body.to || !body.url || !body.type) {
-      return jsonResponse({ success: false, error: 'Missing required fields: to, url, type' }, 400);
+      res.status(400).json({ success: false, error: 'Missing required fields: to, url, type' });
+      return;
     }
     try {
       const id = await sendMedia(body);
-      return jsonResponse({ success: true, data: { id } });
+      res.json({ success: true, data: { id } });
     } catch (err) {
-      return jsonResponse({ success: false, error: String(err) }, 500);
+      res.status(500).json({ success: false, error: String(err) });
     }
-  }
+  });
 
-  function handleGetStatus(): Response {
-    return jsonResponse({
-      success: true,
-      data: {
-        status: getConnectionStatus(),
-        instance: config.instanceName,
-      },
-    });
-  }
+  app.get('/api/status', (_req: Request, res: Response) => {
+    res.json({ success: true, data: { status: getConnectionStatus(), instance: config.instanceName } });
+  });
 
-  function handleGetQr(): Response {
+  app.get('/api/qr', (_req: Request, res: Response) => {
     const qr = getQr();
     if (!qr) {
-      return jsonResponse({ success: false, error: 'No QR available (already connected?)' }, 404);
+      res.status(404).json({ success: false, error: 'No QR available (already connected?)' });
+      return;
     }
-    return jsonResponse({ success: true, data: { qr } });
-  }
+    res.json({ success: true, data: { qr } });
+  });
 
-  async function handleDeleteSession(): Promise<Response> {
+  app.delete('/api/session', async (_req: Request, res: Response) => {
     try {
       await logout();
-      return jsonResponse({ success: true, data: { loggedOut: true } });
+      res.json({ success: true, data: { loggedOut: true } });
     } catch (err) {
-      return jsonResponse({ success: false, error: String(err) }, 500);
+      res.status(500).json({ success: false, error: String(err) });
     }
-  }
+  });
 
-  function handleGetMessages(req: Request): Response {
+  app.get('/api/messages', (req: Request, res: Response) => {
     if (!config.pollingEnabled || !incomingHub) {
-      return jsonResponse({ success: false, error: 'Polling not enabled' }, 404);
+      res.status(404).json({ success: false, error: 'Polling not enabled' });
+      return;
     }
-    const url = new URL(req.url);
-    const since = url.searchParams.get('since') || undefined;
-    const limitParam = url.searchParams.get('limit');
+    const since = typeof req.query.since === 'string' ? req.query.since : undefined;
     let limit = 50;
-    if (limitParam) {
+    const limitParam = req.query.limit;
+    if (typeof limitParam === 'string') {
       const parsed = parseInt(limitParam, 10);
       if (!isNaN(parsed) && parsed > 0) limit = Math.min(parsed, 200);
     }
     const result: PollMessagesResponse = incomingHub.getRecentMessages(since, limit);
-    return jsonResponse({ success: true, data: result });
-  }
+    res.json({ success: true, data: result });
+  });
 
-  function handleGetContacts(): Response {
+  app.get('/api/contacts', (_req: Request, res: Response) => {
     try {
       const contacts = getContacts();
-      return jsonResponse({ success: true, data: { contacts } });
+      res.json({ success: true, data: { contacts } });
     } catch (err) {
-      return jsonResponse({ success: false, error: String(err) }, 500);
+      res.status(500).json({ success: false, error: String(err) });
     }
-  }
+  });
 
-  async function handlePostConnect(): Promise<Response> {
+  app.post('/api/connect', async (_req: Request, res: Response) => {
     try {
       await connect();
-      return jsonResponse({ success: true, data: { connecting: true } });
+      res.json({ success: true, data: { connecting: true } });
     } catch (err) {
-      return jsonResponse({ success: false, error: String(err) }, 500);
+      res.status(500).json({ success: false, error: String(err) });
     }
-  }
+  });
+
+  app.get('/api/messages/stream', (req: Request, res: Response) => {
+    if (!sseTransport) {
+      res.status(404).json({ success: false, error: 'SSE not enabled' });
+      return;
+    }
+    sseTransport.handleConnection(req, res);
+  });
 
   return {
     start() {
-      server = Bun.serve({
-        port,
-        fetch: async (req) => {
-          if (req.method === 'OPTIONS') {
-            return new Response(null, { status: 204, headers: corsHeaders });
-          }
-
-          if (!authenticate(req)) {
-            return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
-          }
-
-          const url = new URL(req.url);
-          const method = req.method;
-
-          if (method === 'POST' && url.pathname === '/api/send') return handlePostSend(req);
-          if (method === 'POST' && url.pathname === '/api/send-media') return handlePostSendMedia(req);
-          if (method === 'GET' && url.pathname === '/api/status') return handleGetStatus();
-          if (method === 'GET' && url.pathname === '/api/qr') return handleGetQr();
-          if (method === 'DELETE' && url.pathname === '/api/session') return handleDeleteSession();
-          if (method === 'GET' && url.pathname === '/api/messages') return handleGetMessages(req);
-          if (method === 'GET' && url.pathname === '/api/contacts') return handleGetContacts();
-          if (method === 'POST' && url.pathname === '/api/connect') return handlePostConnect();
-          if (method === 'GET' && url.pathname === '/api/messages/stream') {
-            if (!sseTransport) {
-              return jsonResponse({ success: false, error: 'SSE not enabled' }, 404);
-            }
-            return sseTransport.handleConnection(req);
-          }
-
-          return jsonResponse({ success: false, error: 'Not Found' }, 404);
-        },
+      server = app.listen(port, () => {
+        logger.info('REST API started', { port });
       });
-
-      logger.info('REST API started', { port });
     },
-
     stop() {
-      server?.stop();
-      server = null;
+      if (server) {
+        server.close();
+        server = null;
+      }
     },
   };
 }

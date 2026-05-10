@@ -21,6 +21,7 @@ function saveApiConfig(url: string, key: string): void {
 }
 
 let config = loadApiConfig();
+console.log('[api] initial config:', { url: config.url, key: config.key ? `${config.key.slice(0, 4)}...` : '(empty)' });
 
 export function getApiConfig() {
   return { ...config };
@@ -29,6 +30,7 @@ export function getApiConfig() {
 export function setApiConfig(url: string, key: string) {
   config = { url: url.replace(/\/+$/, ''), key };
   saveApiConfig(config.url, config.key);
+  console.log('[api] config updated:', { url: config.url, key: config.key ? `${config.key.slice(0, 4)}...` : '(empty)' });
 }
 
 export function getEnvConfig() {
@@ -87,38 +89,53 @@ export async function postConnect() {
   });
 }
 
-export async function connectSSE(
+export function connectSSE(
   onMessage: (data: string) => void,
+  onConnected: () => void,
+  onConnection: (data: string) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  const base = config.url || '';
-  const res = await fetch(`${base}/api/messages/stream`, {
-    headers: { Authorization: `Bearer ${config.key}` },
-    signal,
-  });
+  return new Promise((resolve, reject) => {
+    const base = config.url || '';
+    const sseUrl = `${base}/api/messages/stream?api_key=${encodeURIComponent(config.key)}`;
+    console.log('[sse] EventSource URL:', sseUrl);
 
-  if (!res.ok || !res.body) {
-    throw new Error(`SSE connection failed: ${res.status}`);
-  }
+    const es = new EventSource(sseUrl);
+    let settled = false;
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
+    es.onopen = () => {
+      console.log('[sse] connected');
+      onConnected();
+    };
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const payload = line.slice(6);
-        if (!payload.includes('ping')) {
-          onMessage(payload);
-        }
-      }
+    const msgTypes = ['text', 'image', 'video', 'document', 'audio', 'reaction'];
+    for (const t of msgTypes) {
+      es.addEventListener(t, (e) => {
+        if ((e as MessageEvent).data) onMessage((e as MessageEvent).data);
+      });
     }
-  }
+
+    es.addEventListener('connection', (e) => {
+      if ((e as MessageEvent).data) onConnection((e as MessageEvent).data);
+    });
+
+    es.onerror = () => {
+      if (settled) return;
+      settled = true;
+      es.close();
+      if (!signal.aborted) {
+        console.error('[sse] EventSource error');
+        reject(new Error('SSE connection error'));
+      } else {
+        resolve();
+      }
+    };
+
+    signal.addEventListener('abort', () => {
+      if (settled) return;
+      settled = true;
+      es.close();
+      resolve();
+    }, { once: true });
+  });
 }

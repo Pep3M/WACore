@@ -48,7 +48,7 @@ async function main(): Promise<void> {
   });
   let sseTransport: ReturnType<typeof createSSETransport> | undefined;
   if (config.sseEnabled) {
-    sseTransport = createSSETransport(incomingHub, logger, config.sseHeartbeatMs);
+    sseTransport = createSSETransport(incomingHub, eventBus, logger, config.sseHeartbeatMs);
   }
   const restApi = createRestApi(
     config.apiPort,

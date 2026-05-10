@@ -153,6 +153,7 @@ export async function createBaileysClient(
     });
 
     sock.ev.on('messages.upsert', async (msgEvent) => {
+      logger.info('messages.upsert received', { count: msgEvent.messages.length, type: (msgEvent as any).type });
       for (const msg of msgEvent.messages) {
         const jid = msg.key.remoteJid;
         if (jid && !jid.includes('@g.us') && !jid.includes('@broadcast')) {
@@ -169,6 +170,7 @@ export async function createBaileysClient(
           }
         }
         eventBus.emit('message', msg as any);
+        logger.info('Emitted message event', { id: msg.key?.id, from: msg.key?.remoteJid });
       }
     });
 

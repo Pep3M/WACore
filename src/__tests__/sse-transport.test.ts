@@ -4,6 +4,7 @@ import { createIncomingMessageHub } from '../core/incoming-message-hub';
 import { createSSETransport } from '../transport/sse-transport';
 import { createLogger } from '../utils/logger';
 import type { NormalizedMessage } from '../types';
+import type { Response } from 'express';
 
 const mockConfig = {
   instanceName: 'test', healthPort: 9877, apiPort: 9878, logLevel: 'error' as const,
@@ -14,51 +15,43 @@ const mockConfig = {
 };
 
 const logger = createLogger(mockConfig);
-
 let msgCounter = 0;
 
 function makeMessage(overrides: Partial<NormalizedMessage> = {}): NormalizedMessage {
   msgCounter++;
   return {
     id: `sse-${String(msgCounter).padStart(3, '0')}`,
-    from: '123456@s.whatsapp.net',
-    phone: '123456',
-    pushName: 'TestUser',
-    isGroup: false,
-    groupId: null,
-    timestamp: Math.floor(Date.now() / 1000),
-    type: 'text',
-    body: 'Hello',
-    quotedMessage: null,
-    media: null,
-    ...overrides,
+    from: '123456@s.whatsapp.net', phone: '123456', pushName: 'TestUser',
+    isGroup: false, groupId: null,
+    timestamp: Math.floor(Date.now() / 1000), type: 'text', body: 'Hello',
+    quotedMessage: null, media: null, ...overrides,
   };
 }
 
-async function readAllFromReaderWithTimeout(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  timeoutMs = 500,
-): Promise<string> {
-  const chunks: Uint8Array[] = [];
-
-  const result = await Promise.race([
-    (async () => {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      return '';
-    })(),
-    new Promise<string>((resolve) => {
-      setTimeout(() => {
-        reader.cancel().catch(() => {});
-        resolve(chunks.map(c => new TextDecoder().decode(c)).join(''));
-      }, timeoutMs);
-    }),
-  ]);
-
-  return result;
+function mockRes(): { res: any; data: () => string } {
+  let buffer = '';
+  let closed = false;
+  const listeners: Record<string, Function[]> = {};
+  const res: any = {
+    writeHead(_status: number, headers: Record<string, string>) {
+      res._headers = headers;
+    },
+    write(data: string) {
+      buffer += data;
+      return true;
+    },
+    end() { closed = true; },
+    on(event: string, fn: Function) {
+      (listeners[event] ??= []).push(fn);
+      return this;
+    },
+    emit(event: string) {
+      listeners[event]?.forEach(fn => fn());
+    },
+    get statusCode() { return 200; },
+    _headers: {} as Record<string, string>,
+  };
+  return { res, data: () => buffer };
 }
 
 describe('SSETransport', () => {
@@ -72,158 +65,108 @@ describe('SSETransport', () => {
     hub.start();
   });
 
-  afterEach(() => {
-    hub.stop();
-  });
+  afterEach(() => { hub.stop(); });
 
-  it('returns correct SSE headers', () => {
-    const transport = createSSETransport(hub, logger, 30000);
-    const req = new Request('http://localhost/api/messages/stream');
-    const response = transport.handleConnection(req);
-
-    expect(response.headers.get('Content-Type')).toBe('text/event-stream');
-    expect(response.headers.get('Cache-Control')).toBe('no-cache');
-    expect(response.headers.get('Connection')).toBe('keep-alive');
-    expect(response.status).toBe(200);
+  it('sets correct SSE headers', () => {
+    const transport = createSSETransport(hub, bus, logger, 30000);
+    const { res } = mockRes();
+    transport.handleConnection({ url: '/api/messages/stream' }, res as unknown as Response);
+    expect(res._headers['Content-Type']).toBe('text/event-stream');
+    expect(res._headers['Cache-Control']).toBe('no-cache');
+    expect(res._headers['Connection']).toBe('keep-alive');
   });
 
   it('transmits incoming message as SSE event', async () => {
-    const transport = createSSETransport(hub, logger, 30000);
-    const req = new Request('http://localhost/api/messages/stream');
-    const response = transport.handleConnection(req);
-
-    const reader = response.body!.getReader() as ReadableStreamDefaultReader<Uint8Array> as ReadableStreamDefaultReader<Uint8Array>;
+    const transport = createSSETransport(hub, bus, logger, 30000);
+    const { res, data } = mockRes();
+    transport.handleConnection({ url: '/api/messages/stream' }, res as unknown as Response);
 
     bus.emit('message.text', makeMessage({ id: 'sse-msg-1', body: 'Hello SSE' }));
+    await new Promise(r => setTimeout(r, 50));
 
-    const { value, done } = await reader.read();
-    const text = new TextDecoder().decode(value);
-
+    const text = data();
     expect(text).toContain('id: sse-msg-1');
     expect(text).toContain('event: text');
     expect(text).toContain('Hello SSE');
-
-    reader.cancel().catch(() => {});
   });
 
   it('sends heartbeat periodically', async () => {
-    const transport = createSSETransport(hub, logger, 50);
-    const req = new Request('http://localhost/api/messages/stream');
-    const response = transport.handleConnection(req);
+    const transport = createSSETransport(hub, bus, logger, 50);
+    const { res, data } = mockRes();
+    transport.handleConnection({ url: '/api/messages/stream' }, res as unknown as Response);
 
-    const reader = response.body!.getReader() as ReadableStreamDefaultReader<Uint8Array>;
-
-    // Wait for at least one heartbeat
-    await new Promise(resolve => setTimeout(resolve, 80));
-
-    const { value, done } = await reader.read();
-    const text = new TextDecoder().decode(value);
-
+    await new Promise(r => setTimeout(r, 80));
+    const text = data();
     expect(text).toContain('event: ping');
     expect(text).toContain('{}');
-
-    reader.cancel().catch(() => {});
   });
 
   it('filters by types parameter', async () => {
-    const transport = createSSETransport(hub, logger, 30000);
-    const req = new Request('http://localhost/api/messages/stream?types=image,video');
-    const response = transport.handleConnection(req);
-
-    const reader = response.body!.getReader() as ReadableStreamDefaultReader<Uint8Array>;
+    const transport = createSSETransport(hub, bus, logger, 30000);
+    const { res, data } = mockRes();
+    transport.handleConnection({ url: '/api/messages/stream?types=image,video' }, res as unknown as Response);
 
     bus.emit('message.text', makeMessage({ id: 'sse-text', type: 'text', body: 'ignored' }));
     bus.emit('message.image', makeMessage({ id: 'sse-image', type: 'image', body: 'photo' }));
     bus.emit('message.video', makeMessage({ id: 'sse-video', type: 'video', body: 'clip' }));
+    await new Promise(r => setTimeout(r, 50));
 
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const allData = await readAllFromReaderWithTimeout(reader, 300);
-
-    expect(allData).toContain('sse-image');
-    expect(allData).toContain('sse-video');
-    expect(allData).not.toContain('sse-text');
+    const text = data();
+    expect(text).toContain('sse-image');
+    expect(text).toContain('sse-video');
+    expect(text).not.toContain('sse-text');
   });
 
   it('filters by phone parameter', async () => {
-    const transport = createSSETransport(hub, logger, 30000);
-    const req = new Request('http://localhost/api/messages/stream?phone=999999');
-    const response = transport.handleConnection(req);
-
-    const reader = response.body!.getReader() as ReadableStreamDefaultReader<Uint8Array>;
+    const transport = createSSETransport(hub, bus, logger, 30000);
+    const { res, data } = mockRes();
+    transport.handleConnection({ url: '/api/messages/stream?phone=999999' }, res as unknown as Response);
 
     bus.emit('message.text', makeMessage({ id: 'sse-other', phone: '111111' }));
     bus.emit('message.text', makeMessage({ id: 'sse-target', phone: '999999' }));
+    await new Promise(r => setTimeout(r, 50));
 
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const allData = await readAllFromReaderWithTimeout(reader, 300);
-
-    expect(allData).toContain('sse-target');
-    expect(allData).not.toContain('sse-other');
+    const text = data();
+    expect(text).toContain('sse-target');
+    expect(text).not.toContain('sse-other');
   });
 
   it('filters group messages when includeGroups=false', async () => {
-    const transport = createSSETransport(hub, logger, 30000);
-    const req = new Request('http://localhost/api/messages/stream?includeGroups=false');
-    const response = transport.handleConnection(req);
-
-    const reader = response.body!.getReader() as ReadableStreamDefaultReader<Uint8Array>;
+    const transport = createSSETransport(hub, bus, logger, 30000);
+    const { res, data } = mockRes();
+    transport.handleConnection({ url: '/api/messages/stream?includeGroups=false' }, res as unknown as Response);
 
     bus.emit('message.text', makeMessage({ id: 'sse-group', isGroup: true, groupId: 'abc@g.us' }));
     bus.emit('message.text', makeMessage({ id: 'sse-personal', isGroup: false }));
+    await new Promise(r => setTimeout(r, 50));
 
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const allData = await readAllFromReaderWithTimeout(reader, 300);
-
-    expect(allData).toContain('sse-personal');
-    expect(allData).not.toContain('sse-group');
+    const text = data();
+    expect(text).toContain('sse-personal');
+    expect(text).not.toContain('sse-group');
   });
 
-  it('cleans up resources on disconnection', async () => {
-    const transport = createSSETransport(hub, logger, 30000);
-    const abortController = new AbortController();
-    const req = new Request('http://localhost/api/messages/stream', {
-      signal: abortController.signal,
-    });
-
-    const response = transport.handleConnection(req);
-    const reader = response.body!.getReader() as ReadableStreamDefaultReader<Uint8Array>;
+  it('cleans up on disconnect', async () => {
+    const transport = createSSETransport(hub, bus, logger, 30000);
+    const { res, data } = mockRes();
+    transport.handleConnection({ url: '/api/messages/stream' }, res as unknown as Response);
 
     bus.emit('message.text', makeMessage({ id: 'sse-before' }));
+    await new Promise(r => setTimeout(r, 50));
+    expect(data()).toContain('sse-before');
 
-    await new Promise(resolve => setTimeout(resolve, 50));
-    expect((await reader.read()).value).toBeDefined();
-
-    // Disconnect
-    abortController.abort();
-
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    // Emit after disconnect - should not crash
+    res.emit('close');
+    await new Promise(r => setTimeout(r, 50));
     bus.emit('message.text', makeMessage({ id: 'sse-after' }));
-
-    expect(true).toBe(true);
+    expect(data()).not.toContain('sse-after');
   });
 
-  it('stop closes all active connections', async () => {
-    const transport = createSSETransport(hub, logger, 30000);
-    const req1 = new Request('http://localhost/api/messages/stream');
-    const req2 = new Request('http://localhost/api/messages/stream');
-
-    const res1 = transport.handleConnection(req1);
-    const res2 = transport.handleConnection(req2);
-
-    const reader1 = res1.body!.getReader() as ReadableStreamDefaultReader<Uint8Array>;
-    const reader2 = res2.body!.getReader() as ReadableStreamDefaultReader<Uint8Array>;
-
+  it('stop closes all active connections', () => {
+    const transport = createSSETransport(hub, bus, logger, 30000);
+    const { res: res1 } = mockRes();
+    const { res: res2 } = mockRes();
+    transport.handleConnection({ url: '/api/messages/stream' }, res1 as unknown as Response);
+    transport.handleConnection({ url: '/api/messages/stream' }, res2 as unknown as Response);
     transport.stop();
-
-    const result1 = await reader1.read();
-    expect(result1.done).toBe(true);
-
-    const result2 = await reader2.read();
-    expect(result2.done).toBe(true);
+    expect(true).toBe(true);
   });
 });

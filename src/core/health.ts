@@ -1,12 +1,14 @@
+import type { Application, Request, Response } from 'express';
+import express from 'express';
 import type { Logger } from '../utils/logger';
 import type { ConnectionStatus, HealthStatus } from '../types';
 
 export interface HealthMonitor {
-  start(): void;
-  stop(): void;
   updateConnection(status: ConnectionStatus, phoneNumber?: string): void;
   incrementReconnections(): void;
   getStatus(): HealthStatus;
+  start(): void;
+  stop(): void;
 }
 
 export function createHealthMonitor(
@@ -16,45 +18,38 @@ export function createHealthMonitor(
 ): HealthMonitor {
   let connection: ConnectionStatus = 'disconnected';
   let phoneNumber: string | null = null;
-  let showPhoneNumber = false;
   let reconnections = 0;
   const startTime = Date.now();
-  let server: ReturnType<typeof Bun.serve> | null = null;
+  const app: Application = express();
+  let server: ReturnType<typeof app.listen> | null = null;
+
+  app.get('/health', (_req: Request, res: Response) => {
+    const status: HealthStatus['status'] =
+      connection === 'connected' ? 'healthy'
+      : connection === 'failed' || connection === 'logged-out' ? 'unhealthy'
+      : 'degraded';
+
+    const health: HealthStatus = {
+      status,
+      connection,
+      phoneNumber,
+      uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
+      reconnections,
+    };
+
+    res.json({
+      status: health.status,
+      connection: health.connection,
+      ...(health.phoneNumber ? { phoneNumber: health.phoneNumber } : {}),
+      uptimeSeconds: health.uptimeSeconds,
+      reconnections: health.reconnections,
+    });
+  });
 
   return {
-    start() {
-      const getSt = () => ({
-        status: connection === 'connected' ? 'healthy' as const
-              : connection === 'connecting' || connection === 'awaiting-qr' ? 'degraded' as const
-              : 'unhealthy' as const,
-        connection,
-        ...(showPhoneNumber ? { phoneNumber } : {}),
-        uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
-        reconnections,
-      });
-
-      server = Bun.serve({
-        port,
-        fetch(req) {
-          if (req.method === 'GET' && new URL(req.url).pathname === '/health') {
-            return new Response(JSON.stringify(getSt()), {
-              headers: { 'Content-Type': 'application/json' },
-            });
-          }
-          return new Response('Not Found', { status: 404 });
-        },
-      });
-      logger.info('Health monitor started', { port });
-    },
-
-    stop() {
-      server?.stop();
-      server = null;
-    },
-
-    updateConnection(status, phone, exposePhone = false) {
+    updateConnection(status: ConnectionStatus, phone?: string) {
       connection = status;
-      if (phone) { phoneNumber = phone; showPhoneNumber = exposePhone; }
+      if (phone) phoneNumber = phone;
     },
 
     incrementReconnections() {
@@ -62,16 +57,28 @@ export function createHealthMonitor(
     },
 
     getStatus(): HealthStatus {
-      const isHealthy = connection === 'connected';
-      const isDegraded = connection === 'connecting' || connection === 'awaiting-qr';
-
       return {
-        status: isHealthy ? 'healthy' : isDegraded ? 'degraded' : 'unhealthy',
+        status: connection === 'connected' ? 'healthy'
+          : connection === 'failed' || connection === 'logged-out' ? 'unhealthy'
+          : 'degraded',
         connection,
         phoneNumber,
         uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
         reconnections,
       };
+    },
+
+    start() {
+      server = app.listen(port, () => {
+        logger.info('Health monitor started', { port });
+      });
+    },
+
+    stop() {
+      if (server) {
+        server.close();
+        server = null;
+      }
     },
   };
 }

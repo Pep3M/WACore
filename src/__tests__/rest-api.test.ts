@@ -109,7 +109,7 @@ describe('RestApi polling and SSE', () => {
     const eventBus = createEventBus();
     const hub = createIncomingMessageHub(eventBus, logger, { maxSize: 100, ttlMs: 60000 });
     hub.start();
-    const sseTransportTest = createSSETransport(hub, logger, 30000);
+    const sseTransportTest = createSSETransport(hub, eventBus, logger, 30000);
 
     const pollingConfig = { ...mockConfig, pollingEnabled: true, sseEnabled: true, apiKey: 'poll-secret-2' };
     const pollApi = createRestApi(9885, pollingConfig, logger,
@@ -161,7 +161,7 @@ describe('RestApi polling and SSE', () => {
     const eventBus = createEventBus();
     const hub = createIncomingMessageHub(eventBus, logger, { maxSize: 100, ttlMs: 60000 });
     hub.start();
-    const sseTransportTest = createSSETransport(hub, logger, 30000);
+    const sseTransportTest = createSSETransport(hub, eventBus, logger, 30000);
 
     const pollingConfig = { ...mockConfig, pollingEnabled: true, sseEnabled: true, apiKey: 'poll-secret-3' };
     const pollApi = createRestApi(9886, pollingConfig, logger,

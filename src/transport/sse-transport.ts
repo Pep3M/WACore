@@ -1,114 +1,119 @@
+import type { Response } from 'express';
 import type { Logger } from '../utils/logger';
-import type { NormalizedMessage } from '../types';
+import type { NormalizedMessage, ConnectionUpdateEvent } from '../types';
 import type { IncomingMessageHub } from '../core/incoming-message-hub';
+import type { EventBus } from '../core/event-bus';
 
 export interface SSETransport {
-  handleConnection(req: Request): Response;
+  handleConnection(req: { url: string; signal?: AbortSignal }, res: Response): void;
   stop(): void;
 }
 
 export function createSSETransport(
   incomingHub: IncomingMessageHub,
+  eventBus: EventBus,
   logger: Logger,
   heartbeatMs: number,
 ): SSETransport {
   interface StreamEntry {
-    controller: ReadableStreamDefaultController;
+    res: Response;
     heartbeatTimer: ReturnType<typeof setInterval>;
-    unsubHandler: () => void;
+    unsubMsg: () => void;
   }
 
-  const activeStreams = new Map<ReadableStreamDefaultController, StreamEntry>();
+  const activeStreams = new Map<Response, StreamEntry>();
+  let unsubConnection: (() => void) | null = null;
 
-  function handleConnection(req: Request): Response {
-    const url = new URL(req.url);
-    const typesFilter = url.searchParams.get('types');
-    const phoneFilter = url.searchParams.get('phone');
-    const includeGroups = url.searchParams.get('includeGroups') !== 'false';
+  function broadcastToAll(event: string, data: string): void {
+    for (const { res } of activeStreams.values()) {
+      try { res.write(`event: ${event}\ndata: ${data}\n\n`); } catch { /* stream closed */ }
+    }
+  }
+
+  function handleConnection(req: { url: string; signal?: AbortSignal }, res: Response): void {
+    const parsedUrl = new URL(req.url, 'http://localhost');
+    const typesFilter = parsedUrl.searchParams.get('types');
+    const phoneFilter = parsedUrl.searchParams.get('phone');
+    const includeGroups = parsedUrl.searchParams.get('includeGroups') !== 'false';
     const allowedTypes = typesFilter ? new Set(typesFilter.split(',').map(s => s.trim())) : null;
 
     let streamCancelled = false;
-    let unsubHandler: (() => void) | null = null;
+    let unsubMsg: (() => void) | null = null;
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-    let streamController: ReadableStreamDefaultController | null = null;
 
-    const stream = new ReadableStream({
-      start(controller) {
-        streamController = controller;
+    if (!unsubConnection) {
+      unsubConnection = eventBus.on('connection.update', (update: ConnectionUpdateEvent) => {
+        broadcastToAll('connection', JSON.stringify({
+          status: update.status,
+          phone: update.phoneNumber || null,
+        }));
+      });
+    }
 
-        const encoder = new TextEncoder();
-
-        function sendSSE(event: string, data: string, id?: string): void {
-          if (streamCancelled) return;
-          try {
-            let msg = '';
-            if (id) msg += `id: ${id}\n`;
-            msg += `event: ${event}\n`;
-            msg += `data: ${data}\n\n`;
-            controller.enqueue(encoder.encode(msg));
-          } catch {
-            cleanup();
-          }
-        }
-
-        function onMessage(msg: NormalizedMessage): void {
-          if (streamCancelled) return;
-          if (allowedTypes && !allowedTypes.has(msg.type)) return;
-          if (phoneFilter && msg.phone !== phoneFilter) return;
-          if (!includeGroups && msg.isGroup) return;
-          sendSSE(msg.type, JSON.stringify(msg), msg.id);
-        }
-
-        unsubHandler = incomingHub.registerHandler(onMessage);
-        heartbeatTimer = setInterval(() => {
-          sendSSE('ping', '{}');
-        }, heartbeatMs);
-
-        activeStreams.set(controller, { controller, heartbeatTimer, unsubHandler });
-
-        function cleanup(): void {
-          if (streamCancelled) return;
-          streamCancelled = true;
-          if (heartbeatTimer) clearInterval(heartbeatTimer);
-          if (unsubHandler) unsubHandler();
-          if (streamController) activeStreams.delete(streamController);
-          try { controller.close(); } catch { /* already closed */ }
-        }
-
-        if (req.signal) {
-          req.signal.addEventListener('abort', cleanup, { once: true });
-        }
-      },
-      cancel() {
-        streamCancelled = true;
-        if (streamController) {
-          const entry = activeStreams.get(streamController);
-          if (entry) {
-            clearInterval(entry.heartbeatTimer);
-            entry.unsubHandler();
-            activeStreams.delete(streamController);
-          }
-        }
-      },
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'X-Accel-Buffering': 'no',
     });
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    function sendSSE(event: string, data: string, id?: string): void {
+      if (streamCancelled) return;
+      try {
+        let msg = '';
+        if (id) msg += `id: ${id}\n`;
+        msg += `event: ${event}\n`;
+        msg += `data: ${data}\n\n`;
+        res.write(msg);
+      } catch {
+        cleanup();
+      }
+    }
+
+    function onMessage(msg: NormalizedMessage): void {
+      if (streamCancelled) return;
+      if (allowedTypes && !allowedTypes.has(msg.type)) return;
+      if (phoneFilter && msg.phone !== phoneFilter) return;
+      if (!includeGroups && msg.isGroup) return;
+      sendSSE(msg.type, JSON.stringify(msg), msg.id);
+    }
+
+    heartbeatTimer = setInterval(() => {
+      sendSSE('ping', '{}');
+    }, heartbeatMs);
+
+    unsubMsg = incomingHub.registerHandler(onMessage);
+
+    activeStreams.set(res, { res, heartbeatTimer, unsubMsg });
+
+    function cleanup(): void {
+      if (streamCancelled) return;
+      streamCancelled = true;
+      if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+      if (unsubMsg) { unsubMsg(); unsubMsg = null; }
+      activeStreams.delete(res);
+      try { res.end(); } catch { /* already ended */ }
+    }
+
+    if (req.signal) {
+      req.signal.addEventListener('abort', cleanup, { once: true });
+    }
+
+    res.on('close', cleanup);
   }
 
   function stop(): void {
     for (const entry of activeStreams.values()) {
       clearInterval(entry.heartbeatTimer);
-      entry.unsubHandler();
-      try { entry.controller.close(); } catch { /* already closed */ }
+      entry.unsubMsg();
+      try { entry.res.end(); } catch { /* already ended */ }
     }
     activeStreams.clear();
+    if (unsubConnection) {
+      unsubConnection();
+      unsubConnection = null;
+    }
     logger.info('SSE transport stopped');
   }
 

@@ -5,21 +5,24 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run --watch src/index.ts",
-    "start": "bun run src/index.ts"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "drizzle-kit": "^0.31.10"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "test": "bun test"
   },
   "dependencies": {
     "baileys": "^7.0.0-rc10",
+    "dotenv": "^16.4.0",
     "drizzle-orm": "^0.45.2",
+    "express": "^4.21.0",
     "ioredis": "^5.10.1",
     "postgres": "^3.4.9",
     "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/express": "^5.0.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.19.0",
+    "typescript": "^5"
   }
 }

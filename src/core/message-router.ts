@@ -30,7 +30,7 @@ export function createMessageRouter(eventBus: EventBus, logger: Logger): Message
         pushName: raw.pushName ?? '',
         isGroup: (raw.key?.remoteJid ?? '').endsWith('@g.us'),
         groupId: (raw.key?.remoteJid ?? '').endsWith('@g.us') ? raw.key?.remoteJid ?? null : null,
-        timestamp: raw.messageTimestamp as number ?? Date.now(),
+        timestamp: extractTimestamp(raw.messageTimestamp),
         type,
         body: extractBody(raw, type),
         quotedMessage: extractQuoted(raw),
@@ -46,8 +46,13 @@ export function createMessageRouter(eventBus: EventBus, logger: Logger): Message
     start() {
       eventBus.on('message', (raw: any) => {
         const normalized = normalize(raw);
-        if (!normalized) return;
-      eventBus.emit(MESSAGE_EVENTS[normalized.type] ?? 'message.text', normalized);
+        if (!normalized) {
+          logger.info('Message normalization returned null', { rawKeys: Object.keys(raw), hasMessage: !!raw?.message });
+          return;
+        }
+        const targetEvent = MESSAGE_EVENTS[normalized.type] ?? 'message.text';
+        logger.info('Message normalized', { type: normalized.type, from: normalized.phone, body: normalized.body?.slice(0, 50) });
+        eventBus.emit(targetEvent, normalized);
       });
       logger.info('Message router started');
     },
@@ -105,4 +110,13 @@ function extractMedia(raw: any, type: MessageType): NormalizedMessage['media'] {
 
 function extractPhone(jid: string): string {
   return jid.split('@')[0] ?? jid;
+}
+
+function extractTimestamp(ts: unknown): number {
+  if (typeof ts === 'number') return ts;
+  if (ts && typeof ts === 'object' && 'low' in ts) {
+    const long = ts as { low: number; high: number };
+    return long.low + long.high * 0x100000000;
+  }
+  return Math.floor(Date.now() / 1000);
 }

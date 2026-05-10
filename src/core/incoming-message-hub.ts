@@ -77,6 +77,7 @@ export function createIncomingMessageHub(eventBus: EventBus, logger: Logger, con
   }
 
   function onMessage(msg: NormalizedMessage): void {
+    logger.info('Incoming message hub received', { id: msg.id, type: msg.type, phone: msg.phone });
     push(msg);
     notifyHandlers(msg);
   }

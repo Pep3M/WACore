@@ -1,45 +1,23 @@
-# ============================================================
-# WACore - Multi-stage Docker Build
-# ============================================================
-# Stage 1: Dependencies
-FROM oven/bun:1.2 AS deps
+FROM node:22-alpine AS runtime
+
 WORKDIR /app
 
-COPY package.json bun.lock ./
-RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --verbose
+RUN apk add --no-cache curl
 
-# Stage 2: Build
-FROM oven/bun:1.2 AS build
-WORKDIR /app
+COPY package.json ./
+RUN npm install --omit=dev
 
-COPY package.json bun.lock tsconfig.json ./
-COPY --from=deps /app/node_modules ./node_modules
+COPY tsconfig.json ./
 COPY src/ ./src/
 COPY migrations/ ./migrations/
 
-ENV NODE_ENV=production
+RUN mkdir -p /data/sessions /data/logs && chown -R node:node /data /app
 
-# Stage 3: Runtime
-FROM oven/bun:1.2-slim AS runtime
-WORKDIR /app
-
-RUN apt-get update -qq && apt-get install -y -qq curl --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --from=build /app/src ./src
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/tsconfig.json ./tsconfig.json
-COPY --from=build /app/migrations ./migrations
-
-RUN mkdir -p /data/sessions /data/logs && chown -R bun:bun /data /app
-
-USER bun
+USER node
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -sf http://localhost:${HEALTH_PORT:-9877}/health || exit 1
 
 EXPOSE 9877
 
-ENTRYPOINT ["bun", "run", "src/index.ts"]
+ENTRYPOINT ["npx", "tsx", "src/index.ts"]

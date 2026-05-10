@@ -1,24 +1,14 @@
 # ============================================================
 # WACore - Docker Compose (desarrollo / producción single-node)
 # ============================================================
-# Uso:
-#   docker compose up -d                    # Arrancar todo
-#   docker compose up -d wacore             # Solo wacore
-#   docker compose logs -f wacore           # Ver logs
-#   docker compose down -v                  # Parar y borrar volúmenes
-# ============================================================
-
 services:
-  # --- Servicio principal WACore ---
   wacore:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: wacore
     volumes:
-      # Persistencia de sesiones (CRÍTICO: sin esto, hay que re-escanear QR cada vez)
       - wa_sessions:/data/sessions
-      # Hot-reload en desarrollo: monta src/ local sobre la imagen
       - ./src:/app/src
     ports:
       - "${HEALTH_PORT:-9877}:9877"
@@ -46,12 +36,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # --- Redis (sesiones / colas) ---
   redis:
     image: redis:7-alpine
     container_name: wacore-redis
-    # ports:            # Solo descomentar si necesitas acceder a Redis desde el host
-    #   - "6379:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -60,12 +47,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-    # Descomentar si se requiere autenticación:
-    # command: redis-server --requirepass ${REDIS_PASSWORD:-}
 
-  # --- Webhook sink (inspector de webhooks en desarrollo) ---
-  # Recibe los webhooks que envía WACore y los muestra en una UI web.
-  # URL: http://localhost:9000
   webhook-sink:
     image: webhooksite/webhook:latest
     container_name: wacore-webhook-sink
@@ -76,7 +58,6 @@ services:
       - dev
       - debug
 
-  # --- PostgreSQL (sesiones alternativo) ---
   postgres:
     image: postgres:16-alpine
     container_name: wacore-postgres
