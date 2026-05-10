@@ -15,7 +15,9 @@ WACore es un backend para WhatsApp basado en [Baileys](https://github.com/whiske
   - [Enviar mensaje de texto](#post-apisend--enviar-mensaje-de-texto)
   - [Enviar multimedia](#post-apisend-media--enviar-multimedia)
   - [Estado de conexión](#get-apistatus--estado-de-conexión)
+  - [Listar contactos](#get-apicontacts--listar-contactos)
   - [Cerrar sesión](#delete-apisession--cerrar-sesión)
+  - [Forzar reconexión](#post-apiconnect--forzar-reconexión)
   - [Polling de mensajes entrantes](#get-apimessages--polling-de-mensajes-entrantes)
   - [SSE streaming](#get-apimessagesstream--sse-server-sent-events)
 - [Recepción de mensajes](#recepción-de-mensajes)
@@ -321,6 +323,8 @@ curl -X POST http://localhost:9878/api/send \
 | `to` | string | sí | Número o JID de WhatsApp (con o sin `@s.whatsapp.net`). |
 | `text` | string | sí | Contenido del mensaje. |
 
+> **Al responder a un mensaje recibido**: usa siempre el campo `from` (JID completo, ej: `5215512345678@s.whatsapp.net`), no el campo `phone`. WACore normaliza internamente cualquier formato de JID (incluyendo LIDs de WhatsApp), por lo que `from` siempre es un JID de número telefónico válido al que se puede responder directamente.
+
 **Response:**
 ```json
 {
@@ -368,6 +372,35 @@ curl -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/status
 
 Posibles valores de `status`: `connected`, `connecting`, `disconnected`, `awaiting-qr`, `logged-out`, `failed`.
 
+### `GET /api/contacts` — Listar contactos
+
+Devuelve los contactos conocidos (personas que han escrito al bot o están en la agenda de WhatsApp).
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/contacts
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "contacts": [
+      {
+        "phone": "5215512345678",
+        "name": "Juan Pérez",
+        "jid": "5215512345678@s.whatsapp.net"
+      }
+    ]
+  }
+}
+```
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `phone` | string | Número telefónico sin sufijo. |
+| `name` | string | Nombre del contacto (pushName o verifiedName). |
+| `jid` | string | JID completo para usar en `POST /api/send`. |
+
 ### `DELETE /api/session` — Cerrar sesión
 
 ```bash
@@ -382,6 +415,21 @@ curl -X DELETE -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/ses
 ```
 
 Elimina las credenciales almacenadas y desconecta WhatsApp. Tras esto, WACore quedará desconectado. Para reconectar se requerirá escanear un nuevo QR.
+
+### `POST /api/connect` — Forzar reconexión
+
+Fuerza al cliente a reconectar con WhatsApp. Útil si la conexión se perdió y no se reconectó automáticamente, o si `CONNECT_ON_STARTUP=false`.
+
+```bash
+curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/connect
+```
+
+```json
+{
+  "success": true,
+  "data": { "connecting": true }
+}
+```
 
 ### `GET /api/messages` — Polling de mensajes entrantes
 
@@ -422,6 +470,22 @@ curl -H "Authorization: Bearer $API_KEY" \
 }
 ```
 
+**Campos de cada mensaje:**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `id` | string | ID único del mensaje en WhatsApp. |
+| `from` | string | **JID completo** del remitente (ej: `5215512345678@s.whatsapp.net`). Úsalo siempre como `to` al responder por `POST /api/send`. |
+| `phone` | string | Solo el número telefónico (ej: `5215512345678`). Sirve para identificar contactos o mostrar en UI. **No uses este campo para responder**, usa `from`. |
+| `pushName` | string | Nombre que el contacto tiene configurado en WhatsApp. |
+| `isGroup` | boolean | `true` si el mensaje proviene de un grupo. |
+| `groupId` | string \| null | JID del grupo (solo si `isGroup` es `true`). |
+| `timestamp` | number | Unix timestamp en segundos. |
+| `type` | string | Tipo de mensaje: `text`, `image`, `video`, `document`, `audio`, `reaction`. |
+| `body` | string \| null | Contenido textual del mensaje (caption para multimedia, texto para reactions). |
+| `quotedMessage` | object \| null | Mensaje citado al que responde (si aplica). |
+| `media` | object \| null | Info del archivo multimedia (mimetype, filename, caption). |
+
 ### `GET /api/messages/stream` — SSE (Server-Sent Events)
 
 > Habilitado por defecto (`SSE_ENABLED=true`).
@@ -457,6 +521,12 @@ Eventos disponibles:
 ## Recepción de mensajes
 
 WACore ofrece tres mecanismos para recibir mensajes entrantes de WhatsApp. Puedes usar uno o varios simultáneamente.
+
+> **Importante — `from` vs `phone`**: Cada mensaje incluye dos campos para identificar al remitente:
+> - **`from`**: JID completo (ej: `5215512345678@s.whatsapp.net`). Úsalo **siempre** como valor de `to` al enviar una respuesta mediante `POST /api/send`.
+> - **`phone`**: Solo el número (ej: `5215512345678`). Sirve para identificar contactos en tu UI o base de datos, **no** para responder.
+>
+> WACore resuelve internamente cualquier formato de JID (incluyendo LIDs de WhatsApp), por lo que `from` siempre contiene un JID de número telefónico válido al que se puede responder directamente.
 
 ### SSE (tiempo real)
 
