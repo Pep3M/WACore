@@ -34,8 +34,8 @@ export default function App() {
   const [sendTo, setSendTo] = useState('');
   const [sendText, setSendText] = useState('');
   const [sendError, setSendError] = useState('');
+  const [sseKey, setSseKey] = useState(0);
   const echoRef = useRef(false);
-  const connectionsRef = useRef(0);
 
   echoRef.current = echoMode;
 
@@ -47,6 +47,7 @@ export default function App() {
 
   function applyConfig() {
     setApiConfig(apiUrl, apiKey);
+    setSseKey(k => k + 1);
   }
 
   useEffect(() => {
@@ -75,52 +76,46 @@ export default function App() {
 
   useEffect(() => {
     const ac = new AbortController();
-    connectionsRef.current++;
     setSseStatus('connecting');
 
-    (async () => {
-      try {
-        await connectSSE(
-          (payload) => {
-            try {
-              const msg: NormalizedMessage = JSON.parse(payload);
-              const entry = toLogEntry(msg);
-              setLog(prev => [entry, ...prev].slice(0, 500) as LogData[]);
-              setContacts(prev => {
-                if (!msg.pushName || msg.isGroup) return prev;
-                if (prev.some(c => c.phone === msg.phone)) return prev;
-                return [...prev, { phone: msg.phone, name: msg.pushName }];
-              });
-              if (echoRef.current && msg.body && msg.from && !msg.isGroup) {
-                sendMessage(msg.from, `Echo: ${msg.body}`).then(r2 => {
-                  if (r2.success && r2.data) {
-                    setLog(prev => ([{
-                      id: r2.data!.id, direction: 'outgoing' as const, from: msg.from,
-                      phone: msg.phone, pushName: msg.pushName || msg.phone,
-                      body: `Echo: ${msg.body}`, timestamp: Math.floor(Date.now() / 1000), type: 'text',
-                    }, ...prev] as LogData[]).slice(0, 500));
-                  }
-                }).catch(() => {});
+    connectSSE(
+      (payload) => {
+        try {
+          const msg: NormalizedMessage = JSON.parse(payload);
+          const entry = toLogEntry(msg);
+          setLog(prev => [entry, ...prev].slice(0, 500) as LogData[]);
+          setContacts(prev => {
+            if (!msg.pushName || msg.isGroup) return prev;
+            if (prev.some(c => c.phone === msg.phone)) return prev;
+            return [...prev, { phone: msg.phone, name: msg.pushName }];
+          });
+          if (echoRef.current && msg.body && msg.from && !msg.isGroup) {
+            sendMessage(msg.from, `Echo: ${msg.body}`).then(r2 => {
+              if (r2.success && r2.data) {
+                setLog(prev => ([{
+                  id: r2.data!.id, direction: 'outgoing' as const, from: msg.from,
+                  phone: msg.phone, pushName: msg.pushName || msg.phone,
+                  body: `Echo: ${msg.body}`, timestamp: Math.floor(Date.now() / 1000), type: 'text',
+                }, ...prev] as LogData[]).slice(0, 500));
               }
-            } catch {}
-          },
-          () => setSseStatus('connected'),
-          (payload) => {
-            try {
-              const conn = JSON.parse(payload);
-              setStatus(conn.status || 'disconnected');
-              if (conn.phone) setPhone(conn.phone);
-            } catch {}
-          },
-          ac.signal,
-        );
-      } catch (err) {
-        if (!ac.signal.aborted) setSseStatus('error');
-      }
-    })();
+            }).catch(() => {});
+          }
+        } catch {}
+      },
+      () => setSseStatus('connected'),
+      () => setSseStatus('connecting'),
+      (payload) => {
+        try {
+          const conn = JSON.parse(payload);
+          setStatus(conn.status || 'disconnected');
+          if (conn.phone) setPhone(conn.phone);
+        } catch {}
+      },
+      ac.signal,
+    );
 
     return () => ac.abort();
-  }, []);
+  }, [sseKey]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();

@@ -92,16 +92,16 @@ export async function postConnect() {
 export function connectSSE(
   onMessage: (data: string) => void,
   onConnected: () => void,
+  onDisconnected: () => void,
   onConnection: (data: string) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const base = config.url || '';
     const sseUrl = `${base}/api/messages/stream?api_key=${encodeURIComponent(config.key)}`;
     console.log('[sse] EventSource URL:', sseUrl);
 
     const es = new EventSource(sseUrl);
-    let settled = false;
 
     es.onopen = () => {
       console.log('[sse] connected');
@@ -120,20 +120,11 @@ export function connectSSE(
     });
 
     es.onerror = () => {
-      if (settled) return;
-      settled = true;
-      es.close();
-      if (!signal.aborted) {
-        console.error('[sse] EventSource error');
-        reject(new Error('SSE connection error'));
-      } else {
-        resolve();
-      }
+      console.warn('[sse] connection lost, will auto-reconnect');
+      onDisconnected();
     };
 
     signal.addEventListener('abort', () => {
-      if (settled) return;
-      settled = true;
       es.close();
       resolve();
     }, { once: true });
