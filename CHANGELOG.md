@@ -7,6 +7,26 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.0] — 2026-05-10
+
+### Added
+- Frontend de desarrollo y docker-compose para desarrollo local
+- Postinstall script para parchear baileys automáticamente
+- Temporizador de subida de pre-keys
+
+### Changed
+- Migración de Bun a Node.js + Express para compatibilidad Docker
+- Unificación de frontend con conexión SSE única
+
+### Fixed
+- Reemplazo de APIs específicas de Bun con equivalentes Node.js
+- Regeneración de QR reflejada en frontend via polling
+- Preservación de sesión de WhatsApp al detener/levantar contenedor
+- Reintentos PreKeyError via messages.update, reconexión SSE, parada de sesión
+- Parche baileys getDecryptionJid para usar PN sobre LID, upload pre-keys
+- Merge de pre-keys y tipos anidados en auth keys.get/set en lugar de reemplazar
+- Resolución de JIDs LID a números de teléfono y filtrado de mensajes fromMe
+
 ## [0.1.1] — 2026-05-08
 
 ### Fixed

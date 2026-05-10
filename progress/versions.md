@@ -5,13 +5,14 @@
 
 | Versión | Fecha | Tipo | Features incluidas |
 |---------|-------|------|--------------------|
+| v0.2.0 | 2026-05-10 | minor | Migración Bun→Node.js, fixes LID/PN, pre-keys, PreKeyError, SSE, QR polling, frontend dev |
 | v0.1.1 | 2026-05-08 | patch | Fix DELETE /api/session idempotencia, cleanup sesión en loggedOut |
 | v0.1.0 | 2026-05-08 | initial | RF-01 Conexión WhatsApp, RF-02 Mensajería, RF-03 Integración externa, INFRA-01 Docker |
 
 ## Próxima versión
 
-- **Actual:** v0.1.1
-- **Siguiente:** v0.1.2 (patch por defecto)
+- **Actual:** v0.2.0
+- **Siguiente:** v0.2.1 (patch por defecto)
 - **Features pendientes de empaquetar:** RF-04 Entrega mensajes entrantes, RF-05 PostgreSQL Session Store, RF-01.11 RedisStore
 
 ---
