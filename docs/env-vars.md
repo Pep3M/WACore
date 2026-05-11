@@ -41,12 +41,27 @@
 | `MESSAGE_BUFFER_TTL_MS` | `300000` | Tiempo de vida (ms) de mensajes en buffer (5 min). |
 | `SSE_HEARTBEAT_MS` | `30000` | Intervalo (ms) del heartbeat SSE. |
 
+## Presence & Typing
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `AUTO_TYPING` | `true` | Mostrar "escribiendo..." automáticamente antes de responder. |
+| `TYPING_DURATION_MS` | `3000` | Duración (ms) del indicador de typing antes de renovarse. |
+
+## Media Download
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `MEDIA_DIR` | `/data/media` | Directorio donde se almacenan los archivos multimedia descargados. |
+| `MEDIA_AUTO_DOWNLOAD` | `true` | Descargar automáticamente los medios entrantes (imagen, video, audio, documento). |
+| `MEDIA_BASE_URL` | `http://localhost:9878` | URL base para generar enlaces de descarga de media (usado en respuestas de API). |
+
 ## Webhook
 
 | Variable | Default | Descripción |
 |---|---|---|
 | `WEBHOOK_URL` | — | URL que recibe los mensajes via HTTP POST. Si se omite, webhook deshabilitado. |
 | `WEBHOOK_SECRET` | — | Clave HMAC-SHA256 para firmar los payloads (header `X-WACore-Signature`). |
-| `WEBHOOK_EVENTS` | `message` | Eventos a enviar: `message`, `connection`, `qr` (separados por coma). |
+| `WEBHOOK_EVENTS` | `message` | Eventos a enviar: `message`, `connection`, `qr`, `media.downloaded` (separados por coma). |
 | `WEBHOOK_RETRY_COUNT` | `3` | Número de reintentos ante fallo de entrega. |
 | `WEBHOOK_RETRY_DELAY` | `5000` | Espera (ms) entre reintentos. |

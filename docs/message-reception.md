@@ -74,8 +74,54 @@ Payload que recibe el webhook:
 }
 ```
 
+Para mensajes multimedia, el campo `media` incluye metadatos del archivo:
+
+```json
+"media": {
+  "mimetype": "image/jpeg",
+  "caption": "Foto de prueba",
+  "mediaId": "3EB0C25E6A...",
+  "downloaded": true,
+  "url": "/api/media/3EB0C25E6A..."
+}
+```
+
+| Campo | Descripción |
+|---|---|
+| `mediaId` | ID del archivo para descargar via `GET /api/media/:mediaId`. |
+| `downloaded` | `true` si el archivo ya fue descargado y está disponible. |
+| `url` | Ruta relativa para descargar el archivo. |
+
+### Evento `media.downloaded`
+
+Si `WEBHOOK_EVENTS` incluye `media.downloaded`, se envía un webhook adicional cuando la descarga del archivo se completa:
+
+```json
+{
+  "event": "media.downloaded",
+  "instanceId": "bot-prod",
+  "timestamp": "2025-05-08T12:00:05.000Z",
+  "data": {
+    "mediaId": "3EB0C25E6A...",
+    "filePath": "/data/media/3EB0C25E6A....jpg",
+    "extension": "jpg",
+    "size": 102400,
+    "messageId": "3EB0C25E6A..."
+  }
+}
+```
+
+### Auto-download
+
+Por defecto (`MEDIA_AUTO_DOWNLOAD=true`), WACore descarga automáticamente los archivos multimedia entrantes (imagen, video, audio, documento) en segundo plano. Los archivos se almacenan en `MEDIA_DIR` y se sirven via `GET /api/media/:id`.
+
+Para deshabilitarlo:
+```env
+MEDIA_AUTO_DOWNLOAD=false
+```
+
 Headers adicionales:
-- `X-WACore-Event: message`
+- `X-WACore-Event: <event>`
 - `X-WACore-Instance: bot-prod`
 - `X-WACore-Timestamp: 2025-05-08T12:00:00.000Z`
 - `X-WACore-Signature: <hmac-sha256>` (si se configuró `WEBHOOK_SECRET`)

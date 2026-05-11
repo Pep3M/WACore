@@ -235,7 +235,7 @@ curl -H "Authorization: Bearer $API_KEY" \
 | `type` | string | Tipo de mensaje: `text`, `image`, `video`, `document`, `audio`, `reaction`. |
 | `body` | string \| null | Contenido textual del mensaje (caption para multimedia, texto para reactions). |
 | `quotedMessage` | object \| null | Mensaje citado al que responde (si aplica). |
-| `media` | object \| null | Info del archivo multimedia (mimetype, filename, caption). |
+| `media` | object \| null | Info del archivo multimedia (mimetype, filename, caption, mediaId, downloaded, url). |
 
 ## `GET /api/messages/stream` — SSE (Server-Sent Events)
 
@@ -266,3 +266,51 @@ data: {}
 Eventos disponibles:
 - `message.text`, `message.image`, `message.video`, `message.document`, `message.audio`, `message.reaction`
 - `ping` — heartbeat cada 30s para mantener la conexión viva
+
+## `POST /api/presence` — Enviar indicador de presencia/typing
+
+```bash
+curl -X POST http://localhost:9878/api/presence \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"to":"5215512345678","type":"composing"}'
+```
+
+| Campo | Tipo | Obligatorio | Descripción |
+|---|---|---|---|
+| `to` | string | sí | Número o JID de WhatsApp. |
+| `type` | string | sí | `composing` (escribiendo), `recording` (grabando), `paused` (detenido), `available`, `unavailable`. |
+
+> El bot también puede enviar `composing` automáticamente antes de cada respuesta si `AUTO_TYPING=true`.
+
+## `GET /api/media/:id` — Descargar archivo multimedia
+
+Sirve el archivo multimedia descargado previamente. Requiere que `MEDIA_AUTO_DOWNLOAD=true` (o que se haya descargado manualmente).
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" \
+  "http://localhost:9878/api/media/3EB0C25E6A..." --output foto.jpg
+```
+
+El `:id` corresponde al `mediaId` incluido en el campo `media` del mensaje normalizado.
+
+## `GET /api/media` — Listar archivos multimedia disponibles
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" http://localhost:9878/api/media
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "files": [
+      {
+        "mediaId": "3EB0C25E6A...",
+        "url": "/api/media/3EB0C25E6A...",
+        "exists": true
+      }
+    ]
+  }
+}
+```
