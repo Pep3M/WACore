@@ -10,7 +10,7 @@ const mockConfig = {
   webhookRetryCount: 0, webhookRetryDelay: 0, connectOnStartup: false,
   qrTimeout: 60000,
   pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
-  autoTyping: true, typingDurationMs: 3000,
+  autoTyping: true, typingDurationMs: 3000, autoRead: false,
   nodeEnv: 'test',
   mediaDir: '/tmp/media',
   mediaAutoDownload: false,
@@ -32,6 +32,7 @@ function createMockClient(): BaileysClient {
     logout: mock(async () => {}),
     connect: mock(async () => {}),
     getContacts: mock(() => []),
+    readMessages: mock(async () => {}),
     uploadPreKeysToServerIfRequired: mock(async () => {}),
   };
 }

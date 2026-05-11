@@ -13,6 +13,7 @@ import { createBaileysClient } from './baileys/client';
 import { createMessageSender } from './services/message-sender';
 import { createCommandRegistry } from './commands/registry';
 import { createPresenceManager } from './services/presence-manager';
+import { createReadReceiptManager } from './services/read-receipt-manager';
 import { DiskMediaStore } from './storage/media-store';
 import { createMediaDownloader } from './services/media-downloader';
 
@@ -43,6 +44,7 @@ async function main(): Promise<void> {
   const client = await createBaileysClient(config, eventBus, authProvider, sessionStore, logger);
   const messageSender = createMessageSender(client, eventBus, logger);
   const presenceManager = createPresenceManager(client, config, logger);
+  const readReceiptManager = createReadReceiptManager(client, eventBus, config, logger);
   const mediaStore = new DiskMediaStore(config.mediaDir, logger);
   const mediaDownloader = createMediaDownloader(mediaStore, eventBus, logger, config.mediaAutoDownload, config.mediaBaseUrl);
   const healthMonitor = createHealthMonitor(config.healthPort, logger, config.instanceName);
@@ -67,10 +69,11 @@ async function main(): Promise<void> {
     () => client.logout(),
     () => client.getContacts(),
     () => client.connect(),
-    (to, type) => presenceManager.setPresence(to, type as any),
+    (to, type, duration) => presenceManager.setPresence(to, type as any, duration),
     incomingHub,
     sseTransport,
     mediaStore,
+    (to, participant, ids) => readReceiptManager.sendReadReceipt(to, ids, participant),
   );
 
   // ─── Start media downloader ──────────────────────────────────
@@ -118,6 +121,8 @@ async function main(): Promise<void> {
 
   commandRegistry.start();
 
+  readReceiptManager.start();
+
   // ─── Start subsystems ───────────────────────────────────────
   healthMonitor.start();
   messageRouter.start();
@@ -134,6 +139,7 @@ async function main(): Promise<void> {
     logger.info('Shutdown signal received', { signal });
     commandRegistry.stop();
     presenceManager.stop();
+    readReceiptManager.stop();
     mediaDownloader.stop();
     await client.stop();
     webhookDispatcher.stop();

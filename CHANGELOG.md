@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.1] — 2026-05-10
+
+### Fixed
+- Presence & Typing Indicator (RF-06): composing/recording ya no requieren reset con `paused` entre cambios de tipo (ambos usan el mismo tag XML)
+- Presencia con `duration` ahora refresca periódicamente para evitar auto-expiración de WhatsApp
+- Normalización consistente de JIDs en typingTimers (key vs fullJid)
+
+### Added
+- Parámetro opcional `duration` en `POST /api/presence` para controlar cuánto tiempo se muestra composing/recording
+- Auto-pause automático al expirar el duration (limpia timers/envía paused)
+- Logging mejorado de debug a info para toda la traza de presencia
+
 ## [0.3.0] — 2026-05-10
 
 ### Added

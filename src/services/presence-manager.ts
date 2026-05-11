@@ -3,7 +3,7 @@ import type { BaileysClient } from '../baileys/client';
 import type { EnvConfig, PresenceType } from '../types';
 
 export interface PresenceManager {
-  setPresence(jid: string, type: PresenceType): Promise<void>;
+  setPresence(jid: string, type: PresenceType, durationMs?: number): Promise<void>;
   startTyping(jid: string): void;
   stopTyping(jid: string): void;
   sendWithTyping<T>(jid: string, sendFn: () => Promise<T>): Promise<T>;
@@ -23,31 +23,51 @@ export function createPresenceManager(
   logger: Logger,
 ): PresenceManager {
   const typingTimers = new Map<string, ReturnType<typeof setInterval>>();
+  const typingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
   const lastChatstate = new Map<string, PresenceType>();
 
   function resolveKey(jid: string): string {
     return normalizeJid(jid);
   }
 
+  function clearPresenceRefresh(key: string) {
+    const timer = typingTimers.get(key);
+    if (timer) {
+      clearInterval(timer);
+      typingTimers.delete(key);
+    }
+    const existingTimeout = typingTimeouts.get(key);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+      typingTimeouts.delete(key);
+    }
+  }
+
+  function stopPresenceRefresh(key: string, jid: string) {
+    clearPresenceRefresh(key);
+    lastChatstate.delete(key);
+    client.sendPresenceUpdate(jid, 'paused').catch(() => {});
+  }
+
+  function startPresenceRefresh(key: string, jid: string, type: 'composing' | 'recording') {
+    if (typingTimers.has(key)) return;
+    client.sendPresenceUpdate(jid, type).catch(() => {});
+    const interval = setInterval(() => {
+      client.sendPresenceUpdate(jid, type).catch(() => {});
+    }, config.typingDurationMs);
+    typingTimers.set(key, interval);
+    lastChatstate.set(key, type);
+  }
+
   return {
-    async setPresence(jid: string, type: PresenceType) {
+    async setPresence(jid: string, type: PresenceType, durationMs?: number) {
       const key = resolveKey(jid);
       const fullJid = normalizeJid(jid);
+      logger.info('setPresence called', { jid, fullJid, type, key, hasTimer: typingTimers.has(key), durationMs });
 
-      // Stop any active typing timer for this jid
-      const timer = typingTimers.get(key);
-      if (timer) {
-        clearInterval(timer);
-        typingTimers.delete(key);
-      }
+      clearPresenceRefresh(key);
 
-      // If switching between active chatstate types, send paused first to reset
       if (isChatstate(type)) {
-        const prev = lastChatstate.get(key);
-        if (prev && prev !== type && type !== 'paused') {
-          await client.sendPresenceUpdate(fullJid, 'paused');
-          await new Promise(r => setTimeout(r, 200));
-        }
         if (type === 'paused') {
           lastChatstate.delete(key);
         } else {
@@ -57,34 +77,37 @@ export function createPresenceManager(
         lastChatstate.delete(key);
       }
 
-      await client.sendPresenceUpdate(fullJid, type);
-      logger.debug('Presence sent', { jid: fullJid, type });
+      if (durationMs && durationMs > 0 && (type === 'composing' || type === 'recording')) {
+        startPresenceRefresh(key, fullJid, type);
+        const timeout = setTimeout(() => {
+          stopPresenceRefresh(key, fullJid);
+          logger.info('Presence auto-paused after duration', { jid: fullJid, type, durationMs });
+        }, durationMs);
+        typingTimeouts.set(key, timeout);
+        logger.info('Presence will auto-pause with refresh', { jid: fullJid, type, durationMs });
+      } else {
+        try {
+          await client.sendPresenceUpdate(fullJid, type);
+          logger.info('Presence update sent successfully', { jid: fullJid, type });
+        } catch (err) {
+          logger.error('Presence update failed', { jid: fullJid, type, error: String(err) });
+          throw err;
+        }
+      }
     },
 
     startTyping(jid: string) {
       const key = resolveKey(jid);
-      if (typingTimers.has(key)) return;
       const fullJid = normalizeJid(jid);
-      client.sendPresenceUpdate(fullJid, 'composing').catch(() => {});
-      const interval = setInterval(() => {
-        client.sendPresenceUpdate(fullJid, 'composing').catch(() => {});
-      }, config.typingDurationMs);
-      typingTimers.set(key, interval);
-      lastChatstate.set(key, 'composing');
       logger.debug('Typing started', { jid: fullJid });
+      startPresenceRefresh(key, fullJid, 'composing');
     },
 
     stopTyping(jid: string) {
       const key = resolveKey(jid);
-      const timer = typingTimers.get(key);
-      if (timer) {
-        clearInterval(timer);
-        typingTimers.delete(key);
-      }
       const fullJid = normalizeJid(jid);
-      client.sendPresenceUpdate(fullJid, 'paused').catch(() => {});
-      lastChatstate.delete(key);
       logger.debug('Typing stopped', { jid: fullJid });
+      stopPresenceRefresh(key, fullJid);
     },
 
     async sendWithTyping<T>(jid: string, sendFn: () => Promise<T>): Promise<T> {
@@ -101,10 +124,14 @@ export function createPresenceManager(
     },
 
     stop() {
-      for (const [jid, timer] of typingTimers) {
+      for (const timer of typingTimers.values()) {
         clearInterval(timer);
       }
+      for (const timeout of typingTimeouts.values()) {
+        clearTimeout(timeout);
+      }
       typingTimers.clear();
+      typingTimeouts.clear();
       lastChatstate.clear();
       logger.info('Presence manager stopped, timers cleared');
     },

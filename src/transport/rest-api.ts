@@ -3,7 +3,7 @@ import express from 'express';
 import { existsSync } from 'fs';
 import { extname, join } from 'path';
 import type { Logger } from '../utils/logger';
-import type { EnvConfig, SendMessageRequest, SendMediaRequest, SendPresenceRequest, ApiResponse, PollMessagesResponse, MediaStore } from '../types';
+import type { EnvConfig, SendMessageRequest, SendMediaRequest, SendPresenceRequest, ReadReceiptRequest, ApiResponse, PollMessagesResponse, MediaStore } from '../types';
 import type { IncomingMessageHub } from '../core/incoming-message-hub';
 import type { SSETransport } from './sse-transport';
 
@@ -23,10 +23,11 @@ export function createRestApi(
   logout: () => Promise<void>,
   getContacts: () => Array<{ phone: string; name: string }>,
   connect: () => Promise<void>,
-  sendPresence?: (to: string, type: string) => Promise<void>,
+  sendPresence?: (to: string, type: string, duration?: number) => Promise<void>,
   incomingHub?: IncomingMessageHub,
   sseTransport?: SSETransport,
   mediaStore?: MediaStore,
+  sendReadReceipt?: (to: string, participant: string | undefined, messageIds: string[]) => Promise<void>,
 ): RestApi {
   if (!config.apiKey) {
     return {
@@ -150,12 +151,37 @@ export function createRestApi(
     }
   });
 
+  app.post('/api/read', async (req: Request, res: Response) => {
+    if (!sendReadReceipt) {
+      res.status(404).json({ success: false, error: 'Read receipts not available' });
+      return;
+    }
+    const { to, messageId, messageIds, participant } = req.body as ReadReceiptRequest;
+    if (!to) {
+      res.status(400).json({ success: false, error: 'Missing required field: to' });
+      return;
+    }
+    const ids = messageIds ?? (messageId ? [messageId] : null);
+    if (!ids || ids.length === 0) {
+      res.status(400).json({ success: false, error: 'Missing required field: messageId or messageIds' });
+      return;
+    }
+    try {
+      await sendReadReceipt(to, participant, ids);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
   app.post('/api/presence', async (req: Request, res: Response) => {
     if (!sendPresence) {
+      logger.warn('POST /api/presence — sendPresence not available');
       res.status(404).json({ success: false, error: 'Presence not available' });
       return;
     }
-    const { to, type } = req.body as SendPresenceRequest;
+    const { to, type, duration } = req.body as SendPresenceRequest;
+    logger.info('POST /api/presence called', { to, type, duration });
     if (!to || !type) {
       res.status(400).json({ success: false, error: 'Missing required fields: to, type' });
       return;
@@ -165,10 +191,13 @@ export function createRestApi(
       res.status(400).json({ success: false, error: `Invalid type. Must be one of: ${validTypes.join(', ')}` });
       return;
     }
+    const finalDuration = (duration && typeof duration === 'number' && duration > 0) ? duration : undefined;
     try {
-      await sendPresence(to, type);
+      await sendPresence(to, type, finalDuration);
+      logger.info('POST /api/presence success', { to, type, duration: finalDuration });
       res.json({ success: true });
     } catch (err) {
+      logger.error('POST /api/presence error', { to, type, error: String(err) });
       res.status(500).json({ success: false, error: String(err) });
     }
   });

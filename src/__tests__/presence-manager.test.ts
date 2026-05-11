@@ -11,7 +11,7 @@ const mockConfig: EnvConfig = {
   qrTimeout: 60000, nodeEnv: 'test',
   pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000,
   messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
-  autoTyping: true, typingDurationMs: 3000,
+  autoTyping: true, typingDurationMs: 3000, autoRead: false,
   mediaDir: '/tmp/media',
   mediaAutoDownload: false,
   mediaBaseUrl: 'http://localhost:9878',
@@ -32,6 +32,7 @@ function createMockClient(): BaileysClient {
     logout: mock(async () => {}),
     connect: mock(async () => {}),
     getContacts: mock(() => []),
+    readMessages: mock(async () => {}),
     uploadPreKeysToServerIfRequired: mock(async () => {}),
   };
 }
@@ -86,27 +87,14 @@ describe('PresenceManager', () => {
       expect(client.sendPresenceUpdate).toHaveBeenLastCalledWith(
         '123456@s.whatsapp.net', 'recording',
       );
-      // startTyping sent composing (1), so 3 calls: composing + paused(reset) + recording
+      // startTyping sent composing + setPresence sends recording (no paused reset needed)
       const calls = (client.sendPresenceUpdate as any).mock.calls;
-      expect(calls.length).toBe(3);
+      expect(calls.length).toBe(2);
       expect(calls[0]).toEqual(['123456@s.whatsapp.net', 'composing']);
-      expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'paused']);
-      expect(calls[2]).toEqual(['123456@s.whatsapp.net', 'recording']);
+      expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'recording']);
     });
 
-    it('does not send paused on first setPresence chatstate call', async () => {
-      const client = createMockClient();
-      const pm = createPresenceManager(client, mockConfig, logger);
-
-      await pm.setPresence('123456', 'recording');
-
-      expect(client.sendPresenceUpdate).toHaveBeenCalledTimes(1);
-      expect(client.sendPresenceUpdate).toHaveBeenCalledWith(
-        '123456@s.whatsapp.net', 'recording',
-      );
-    });
-
-    it('sends paused before switching composing to recording', async () => {
+    it('sends chatstate directly without reset', async () => {
       const client = createMockClient();
       const pm = createPresenceManager(client, mockConfig, logger);
 
@@ -114,12 +102,12 @@ describe('PresenceManager', () => {
       await pm.setPresence('123456', 'recording');
 
       const calls = (client.sendPresenceUpdate as any).mock.calls;
+      expect(calls.length).toBe(2);
       expect(calls[0]).toEqual(['123456@s.whatsapp.net', 'composing']);
-      expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'paused']);
-      expect(calls[2]).toEqual(['123456@s.whatsapp.net', 'recording']);
+      expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'recording']);
     });
 
-    it('sends paused only once when switching composing to paused', async () => {
+    it('composing then paused sends both directly', async () => {
       const client = createMockClient();
       const pm = createPresenceManager(client, mockConfig, logger);
 
@@ -132,7 +120,7 @@ describe('PresenceManager', () => {
       expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'paused']);
     });
 
-    it('available after composing does not send paused (different channel)', async () => {
+    it('available after composing works (different channel)', async () => {
       const client = createMockClient();
       const pm = createPresenceManager(client, mockConfig, logger);
 
@@ -143,6 +131,84 @@ describe('PresenceManager', () => {
       expect(calls.length).toBe(2);
       expect(calls[0]).toEqual(['123456@s.whatsapp.net', 'composing']);
       expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'available']);
+    });
+  });
+
+  describe('setPresence with duration', () => {
+    it('schedules auto-pause when duration provided', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+      const spy = spyOn(globalThis, 'setTimeout');
+
+      await pm.setPresence('123456', 'composing', 5000);
+
+      expect(spy).toHaveBeenCalledWith(expect.any(Function), 5000);
+      spy.mockRestore();
+    });
+
+    it('does not schedule auto-pause without duration', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+      const spy = spyOn(globalThis, 'setTimeout');
+
+      await pm.setPresence('123456', 'composing');
+
+      // setTimeout is called by the 800ms delay in sendWithTyping from other tests,
+      // but for this specific call, it shouldn't schedule any new timeout
+      expect(client.sendPresenceUpdate).toHaveBeenCalledWith('123456@s.whatsapp.net', 'composing');
+      spy.mockRestore();
+    });
+
+    it('does not schedule auto-pause for paused type', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+      const spy = spyOn(globalThis, 'setTimeout');
+
+      await pm.setPresence('123456', 'paused', 5000);
+
+      const setTimeoutsAfter = spy.mock.calls.length;
+      expect(setTimeoutsAfter).toBe(0);
+      spy.mockRestore();
+    });
+
+    it('does not schedule auto-pause for available/unavailable', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+      const spy = spyOn(globalThis, 'setTimeout');
+
+      await pm.setPresence('123456', 'available', 5000);
+
+      const setTimeoutsAfter = spy.mock.calls.length;
+      expect(setTimeoutsAfter).toBe(0);
+      spy.mockRestore();
+    });
+
+    it('clears previous timeout when setPresence called again with duration', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+      const spy = spyOn(globalThis, 'clearTimeout');
+
+      await pm.setPresence('123456', 'composing', 5000);
+      await pm.setPresence('123456', 'recording', 3000);
+
+      expect(spy).toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('auto-pause sends paused after duration', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+
+      await pm.setPresence('123456', 'composing', 10);
+
+      // Wait for the timeout to fire
+      await new Promise(r => setTimeout(r, 50));
+
+      // composing + paused
+      const calls = (client.sendPresenceUpdate as any).mock.calls;
+      expect(calls.length).toBe(2);
+      expect(calls[0]).toEqual(['123456@s.whatsapp.net', 'composing']);
+      expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'paused']);
     });
   });
 

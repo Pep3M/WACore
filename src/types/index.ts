@@ -44,6 +44,7 @@ export interface EnvConfig {
   sseHeartbeatMs: number;
   autoTyping: boolean;
   typingDurationMs: number;
+  autoRead: boolean;
   mediaDir: string;
   mediaAutoDownload: boolean;
   mediaBaseUrl: string;
@@ -245,6 +246,14 @@ export type PresenceType = 'composing' | 'recording' | 'paused' | 'available' | 
 export interface SendPresenceRequest {
   to: string;
   type: PresenceType;
+  duration?: number;
+}
+
+export interface ReadReceiptRequest {
+  to: string;
+  messageId?: string;
+  messageIds?: string[];
+  participant?: string;
 }
 
 // ─── Sistema de comandos ────────────────────────────────────────

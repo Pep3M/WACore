@@ -9,7 +9,7 @@ const mockConfig = {
   webhookRetryCount: 1, webhookRetryDelay: 10, webhookUrl: 'http://localhost:18999/webhook',
   webhookSecret: 'test-secret', connectOnStartup: false, qrTimeout: 60000,
   pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
-  autoTyping: true, typingDurationMs: 3000,
+  autoTyping: true, typingDurationMs: 3000, autoRead: false,
   nodeEnv: 'test',
   mediaDir: '/tmp/media',
   mediaAutoDownload: false,

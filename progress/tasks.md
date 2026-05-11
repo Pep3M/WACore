@@ -44,10 +44,10 @@
 | RF-07.2 | MediaStore en disco | done | — | @developer | — | — | done | — |
 | RF-07.3 | API REST GET /api/media/:id | done | — | @developer | — | — | done | — |
 | RF-07.4 | Media en webhooks y normalized messages | done | — | @developer | — | — | done | — |
-| RF-08 | Read Receipts | backlog | — | — | — | — | — | — |
-| RF-08.1 | Marcar mensaje como leído | backlog | — | — | — | — | — | — |
-| RF-08.2 | API REST POST /api/read | backlog | — | — | — | — | — | — |
-| RF-08.3 | Auto-read configurable | backlog | — | — | — | — | — | — |
+| RF-08 | Read Receipts | done | @software-architect | @developer | — | done | done | — |
+| RF-08.1 | Marcar mensaje como leído | done | — | @developer | — | — | done | — |
+| RF-08.2 | API REST POST /api/read | done | — | @developer | — | — | done | — |
+| RF-08.3 | Auto-read configurable | done | — | @developer | — | — | done | — |
 | RF-09 | Reacciones a mensajes | backlog | — | — | — | — | — | — |
 | RF-09.1 | Send reaction vía API | backlog | — | — | — | — | — | — |
 | RF-09.2 | Recibir/normalizar reacciones | backlog | — | — | — | — | — | — |

@@ -5,6 +5,7 @@
 
 | Versión | Fecha | Tipo | Features incluidas |
 |---------|-------|------|--------------------|
+| v0.3.1 | 2026-05-10 | patch | RF-06 fixes: duration, refresh, auto-pause, logging |
 | v0.3.0 | 2026-05-10 | minor | RF-06 Presence & Typing Indicator |
 | v0.2.0 | 2026-05-10 | minor | Migración Bun→Node.js, fixes LID/PN, pre-keys, PreKeyError, SSE, QR polling, frontend dev |
 | v0.1.1 | 2026-05-08 | patch | Fix DELETE /api/session idempotencia, cleanup sesión en loggedOut |
@@ -12,8 +13,8 @@
 
 ## Próxima versión
 
-- **Actual:** v0.3.0
-- **Siguiente:** v0.3.1 (patch por defecto)
+- **Actual:** v0.3.1
+- **Siguiente:** v0.3.2 (patch por defecto)
 - **Features pendientes de empaquetar:** RF-07 Media Download, RF-08 Read Receipts, RF-09 Reactions, RF-10 Quoted, RF-11 Group Mgmt, RF-12 Stickers/PTV, RF-13 Location/Contact, RF-14 Polls, RF-15 Chat Mgmt, RF-16 Commands Avanzados, RF-17 Newsletter, RF-18 Business Profile
 
 ---

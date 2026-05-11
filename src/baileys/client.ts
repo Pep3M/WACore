@@ -27,6 +27,12 @@ export interface BaileysClient {
   connect(): Promise<void>;
   sendMessage(jid: string, content: any): Promise<any>;
   sendPresenceUpdate(jid: string, type: PresenceType): Promise<void>;
+  readMessages(keys: Array<{
+    remoteJid: string;
+    id: string;
+    fromMe?: boolean;
+    participant?: string;
+  }>): Promise<void>;
   getConnectionStatus(): ConnectionStatus;
   getQr(): string | null;
   logout(): Promise<void>;
@@ -276,6 +282,11 @@ export async function createBaileysClient(
     async sendPresenceUpdate(jid: string, type: PresenceType) {
       if (!socket) throw new Error('Socket not initialized');
       await socket.sendPresenceUpdate(type, jid);
+    },
+
+    async readMessages(keys) {
+      if (!socket) throw new Error('Socket not initialized');
+      await socket.readMessages(keys);
     },
 
     getConnectionStatus: () => connectionStatus,
