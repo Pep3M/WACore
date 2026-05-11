@@ -8,7 +8,7 @@ const mockConfig = {
   webhookRetryCount: 0, webhookRetryDelay: 0, connectOnStartup: false,
   qrTimeout: 60000,
   pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
-  nodeEnv: 'test', redisUrl: 'redis://localhost:6379',
+  nodeEnv: 'test', autoTyping: true, typingDurationMs: 3000, redisUrl: 'redis://localhost:6379',
 };
 const logger = createLogger(mockConfig);
 

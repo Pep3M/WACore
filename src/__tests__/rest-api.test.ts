@@ -12,7 +12,7 @@ const mockConfig = {
   webhookRetryCount: 0, webhookRetryDelay: 0, connectOnStartup: false,
   qrTimeout: 60000,
   pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
-  nodeEnv: 'test', apiKey: 'supersecret',
+  nodeEnv: 'test', autoTyping: true, typingDurationMs: 3000, apiKey: 'supersecret',
 };
 const logger = createLogger(mockConfig);
 
@@ -120,6 +120,7 @@ describe('RestApi polling and SSE', () => {
       async () => {},
       () => [],
       async () => {},
+      undefined,
       hub,
       sseTransportTest,
     );
@@ -172,6 +173,7 @@ describe('RestApi polling and SSE', () => {
       async () => {},
       () => [],
       async () => {},
+      undefined,
       hub,
       sseTransportTest,
     );

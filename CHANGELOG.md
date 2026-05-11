@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.0] — 2026-05-10
+
+### Added
+- Presence & Typing Indicator (RF-06)
+  - PresenceManager service con startTyping, stopTyping, setPresence, sendWithTyping
+  - Endpoint REST `POST /api/presence` (tipos: composing, recording, paused, available, unavailable)
+  - Auto-typing automático antes de responder comandos (configurable vía AUTO_TYPING)
+
 ## [0.2.0] — 2026-05-10
 
 ### Added

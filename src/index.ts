@@ -12,6 +12,7 @@ import { createAuthProvider } from './baileys/auth';
 import { createBaileysClient } from './baileys/client';
 import { createMessageSender } from './services/message-sender';
 import { createCommandRegistry } from './commands/registry';
+import { createPresenceManager } from './services/presence-manager';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -39,6 +40,7 @@ async function main(): Promise<void> {
   const authProvider = await createAuthProvider(sessionStore, logger);
   const client = await createBaileysClient(config, eventBus, authProvider, sessionStore, logger);
   const messageSender = createMessageSender(client, eventBus, logger);
+  const presenceManager = createPresenceManager(client, config, logger);
   const healthMonitor = createHealthMonitor(config.healthPort, logger, config.instanceName);
   const messageRouter = createMessageRouter(eventBus, logger);
   const webhookDispatcher = createWebhookDispatcher(eventBus, config, logger);
@@ -61,6 +63,7 @@ async function main(): Promise<void> {
     () => client.logout(),
     () => client.getContacts(),
     () => client.connect(),
+    (to, type) => presenceManager.setPresence(to, type as any),
     incomingHub,
     sseTransport,
   );
@@ -78,7 +81,7 @@ async function main(): Promise<void> {
   // ─── Command system ─────────────────────────────────────────
   const commandRegistry = createCommandRegistry(
     eventBus,
-    (to, text) => messageSender.sendText(to, text),
+    (to, text) => presenceManager.sendWithTyping(to, () => messageSender.sendText(to, text)),
     logger,
   );
 
@@ -122,6 +125,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string) => {
     logger.info('Shutdown signal received', { signal });
     commandRegistry.stop();
+    presenceManager.stop();
     await client.stop();
     webhookDispatcher.stop();
     messageRouter.stop();

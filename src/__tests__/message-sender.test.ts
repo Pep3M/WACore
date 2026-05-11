@@ -10,6 +10,7 @@ const mockConfig = {
   webhookRetryCount: 0, webhookRetryDelay: 0, connectOnStartup: false,
   qrTimeout: 60000,
   pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
+  autoTyping: true, typingDurationMs: 3000,
   nodeEnv: 'test',
 };
 const logger = createLogger(mockConfig);
@@ -22,6 +23,7 @@ function createMockClient(): BaileysClient {
     sendMessage: mock(async (jid: string, content: any) => ({
       key: { id: `msg-${jid}-${Date.now()}` },
     })),
+    sendPresenceUpdate: mock(async () => {}),
     getConnectionStatus: mock(() => 'connected' as const),
     getQr: mock(() => null),
     logout: mock(async () => {}),

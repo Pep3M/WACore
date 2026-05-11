@@ -1,7 +1,7 @@
 import type { Application, Request, Response, NextFunction } from 'express';
 import express from 'express';
 import type { Logger } from '../utils/logger';
-import type { EnvConfig, SendMessageRequest, SendMediaRequest, ApiResponse, PollMessagesResponse } from '../types';
+import type { EnvConfig, SendMessageRequest, SendMediaRequest, SendPresenceRequest, ApiResponse, PollMessagesResponse } from '../types';
 import type { IncomingMessageHub } from '../core/incoming-message-hub';
 import type { SSETransport } from './sse-transport';
 
@@ -21,6 +21,7 @@ export function createRestApi(
   logout: () => Promise<void>,
   getContacts: () => Array<{ phone: string; name: string }>,
   connect: () => Promise<void>,
+  sendPresence?: (to: string, type: string) => Promise<void>,
   incomingHub?: IncomingMessageHub,
   sseTransport?: SSETransport,
 ): RestApi {
@@ -141,6 +142,29 @@ export function createRestApi(
     try {
       await connect();
       res.json({ success: true, data: { connecting: true } });
+    } catch (err) {
+      res.status(500).json({ success: false, error: String(err) });
+    }
+  });
+
+  app.post('/api/presence', async (req: Request, res: Response) => {
+    if (!sendPresence) {
+      res.status(404).json({ success: false, error: 'Presence not available' });
+      return;
+    }
+    const { to, type } = req.body as SendPresenceRequest;
+    if (!to || !type) {
+      res.status(400).json({ success: false, error: 'Missing required fields: to, type' });
+      return;
+    }
+    const validTypes = ['composing', 'recording', 'paused', 'available', 'unavailable'];
+    if (!validTypes.includes(type)) {
+      res.status(400).json({ success: false, error: `Invalid type. Must be one of: ${validTypes.join(', ')}` });
+      return;
+    }
+    try {
+      await sendPresence(to, type);
+      res.json({ success: true });
     } catch (err) {
       res.status(500).json({ success: false, error: String(err) });
     }

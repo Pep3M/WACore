@@ -30,5 +30,7 @@ export function loadConfig(): EnvConfig {
     messageBufferSize: parseInt(process.env.MESSAGE_BUFFER_SIZE || '1000', 10),
     messageBufferTtlMs: parseInt(process.env.MESSAGE_BUFFER_TTL_MS || '300000', 10),
     sseHeartbeatMs: parseInt(process.env.SSE_HEARTBEAT_MS || '30000', 10),
+    autoTyping: process.env.AUTO_TYPING !== 'false',
+    typingDurationMs: parseInt(process.env.TYPING_DURATION_MS || '3000', 10),
   };
 }

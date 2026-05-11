@@ -25,6 +25,8 @@ export interface EnvConfig {
   messageBufferSize: number;
   messageBufferTtlMs: number;
   sseHeartbeatMs: number;
+  autoTyping: boolean;
+  typingDurationMs: number;
 }
 
 // ─── Eventos del bus interno ──────────────────────────────────
@@ -202,6 +204,15 @@ export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+// ─── Presence ───────────────────────────────────────────
+
+export type PresenceType = 'composing' | 'recording' | 'paused' | 'available' | 'unavailable';
+
+export interface SendPresenceRequest {
+  to: string;
+  type: PresenceType;
 }
 
 // ─── Sistema de comandos ────────────────────────────────────────

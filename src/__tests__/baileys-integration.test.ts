@@ -22,6 +22,7 @@ const testConfig: EnvConfig = {
   connectOnStartup: false,
   qrTimeout: 60000,
   pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
+  autoTyping: true, typingDurationMs: 3000,
   nodeEnv: 'test',
 };
 
@@ -77,7 +78,7 @@ mock.module('baileys', () => ({
   jidNormalizedUser: (jid: string) => {
     const atIdx = jid.indexOf('@');
     if (atIdx < 0) return jid;
-    const userPart = jid.slice(0, atIdx).split(':')[0].split('_')[0];
+    const userPart = (jid.slice(0, atIdx).split(':')[0] ?? '').split('_')[0];
     const server = jid.slice(atIdx + 1);
     return `${userPart}@${server === 'c.us' ? 's.whatsapp.net' : server}`;
   },

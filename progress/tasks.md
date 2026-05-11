@@ -35,6 +35,37 @@
 | RF-05.1 | PostgresStore (SessionStore impl) | done | — | @developer | @qa-tester | — | done | approved |
 | RF-05.2 | Migraciones automáticas (Drizzle) | done | — | @developer | @qa-tester | — | done | approved |
 | RF-05.3 | Docker entrypoint + compose | done | — | @developer | @qa-tester | — | done | approved |
+| RF-06 | Presence & Typing Indicator | done | @software-architect | @developer | — | done | done | — |
+| RF-06.1 | PresenceManager service | done | — | @developer | — | — | done | — |
+| RF-06.2 | API REST presence endpoint | done | — | @developer | — | — | done | — |
+| RF-06.3 | Auto-typing al responder | done | — | @developer | — | — | done | — |
+| RF-07 | Recepción y descarga de medios | backlog | — | — | — | — | — | — |
+| RF-07.1 | MediaDownloader (downloadMediaMessage) | backlog | — | — | — | — | — | — |
+| RF-07.2 | MediaStore en disco | backlog | — | — | — | — | — | — |
+| RF-07.3 | API REST GET /api/media/:id | backlog | — | — | — | — | — | — |
+| RF-07.4 | Media en webhooks y normalized messages | backlog | — | — | — | — | — | — |
+| RF-08 | Read Receipts | backlog | — | — | — | — | — | — |
+| RF-08.1 | Marcar mensaje como leído | backlog | — | — | — | — | — | — |
+| RF-08.2 | API REST POST /api/read | backlog | — | — | — | — | — | — |
+| RF-08.3 | Auto-read configurable | backlog | — | — | — | — | — | — |
+| RF-09 | Reacciones a mensajes | backlog | — | — | — | — | — | — |
+| RF-09.1 | Send reaction vía API | backlog | — | — | — | — | — | — |
+| RF-09.2 | Recibir/normalizar reacciones | backlog | — | — | — | — | — | — |
+| RF-10 | Mensajes con quoted/reply | backlog | — | — | — | — | — | — |
+| RF-10.1 | quoted en sendText y sendMedia | backlog | — | — | — | — | — | — |
+| RF-11 | Gestión de grupos | backlog | — | — | — | — | — | — |
+| RF-11.1 | Crear grupo | backlog | — | — | — | — | — | — |
+| RF-11.2 | Participantes (add/remove/kick/promote/demote) | backlog | — | — | — | — | — | — |
+| RF-11.3 | Settings del grupo | backlog | — | — | — | — | — | — |
+| RF-11.4 | Metadata del grupo | backlog | — | — | — | — | — | — |
+| RF-11.5 | Invite codes | backlog | — | — | — | — | — | — |
+| RF-12 | Envío de stickers y PTU (video note) | backlog | — | — | — | — | — | — |
+| RF-13 | Mensajes de ubicación y contacto | backlog | — | — | — | — | — | — |
+| RF-14 | Encuestas (Poll messages) | backlog | — | — | — | — | — | — |
+| RF-15 | Chat Management (archive, pin, mute) | backlog | — | — | — | — | — | — |
+| RF-16 | Comandos avanzados (middleware, permisos) | backlog | — | — | — | — | — | — |
+| RF-17 | Newsletter | backlog | — | — | — | — | — | — |
+| RF-18 | Business Profile & Catalog | backlog | — | — | — | — | — | — |
 
 ---
 
@@ -47,6 +78,11 @@ Orden 3:  Cliente socket → Event handlers → Reconnection → Health
 Orden 4:  Message Router → Message Sender
 Orden 5:  Circuit Breaker → Webhook Dispatcher → REST API
 Orden 6:  Bootstrap → Docker → Tests
+Orden 7:  RF-06 Presence/Typing → RF-07 Media Download → RF-08 Read Receipts
+Orden 8:  RF-09 Reactions → RF-10 Quoted Messages → RF-11 Group Management
+Orden 9:  RF-12 Stickers/PTV → RF-13 Location/Contact → RF-14 Polls
+Orden 10: RF-15 Chat Management → RF-16 Commands Avanzados
+Orden 11: RF-17 Newsletter → RF-18 Business Profile
 ```
 
 ---

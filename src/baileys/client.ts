@@ -11,7 +11,7 @@ import type { Logger } from '../utils/logger';
 import type { EventBus } from '../core/event-bus';
 import type { AuthProvider } from './auth';
 import type { SessionStore } from '../storage/session-store';
-import type { EnvConfig, ConnectionStatus } from '../types';
+import type { EnvConfig, ConnectionStatus, PresenceType } from '../types';
 import { createReconnectionManager } from '../core/reconnection';
 
 export interface Contact {
@@ -26,6 +26,7 @@ export interface BaileysClient {
   stop(): Promise<void>;
   connect(): Promise<void>;
   sendMessage(jid: string, content: any): Promise<any>;
+  sendPresenceUpdate(jid: string, type: PresenceType): Promise<void>;
   getConnectionStatus(): ConnectionStatus;
   getQr(): string | null;
   logout(): Promise<void>;
@@ -270,6 +271,11 @@ export async function createBaileysClient(
     async sendMessage(jid: string, content: any) {
       if (!socket) throw new Error('Socket not initialized');
       return await socket.sendMessage(jid, content);
+    },
+
+    async sendPresenceUpdate(jid: string, type: PresenceType) {
+      if (!socket) throw new Error('Socket not initialized');
+      await socket.sendPresenceUpdate(type, jid);
     },
 
     getConnectionStatus: () => connectionStatus,

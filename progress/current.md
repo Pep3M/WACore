@@ -1,68 +1,56 @@
 # Sesión actual
 
-- **Feature en curso:** RF-05: PostgreSQL Session Store
-- **Fase:** implementing → done → testing → **CHANGES_REQUESTED**
-- **Inicio:** 2026-05-08
-- **Agente:** @qa-tester
+- **Feature en curso:** RF-06: Presence & Typing Indicator
+- **Fase:** implementing → **done**
+- **Inicio:** 2026-05-10
+- **Agente:** @developer
 
 ## Bitácora
 
-### Fase 1: Dependencias y schema
-- Instaladas dependencias: `drizzle-orm@0.45.2`, `postgres@3.4.9`, `drizzle-kit@0.31.10`
-- Creado `src/storage/postgres-db.ts` con schema Drizzle (`wacore_sessions`), `waitForPostgres()`, `runMigrations()`, `createConnection()`
-- Creado `drizzle.config.ts` apuntando al schema
-- Generada migración inicial `migrations/0000_nappy_matthew_murdock.sql` (CREATE TABLE wacore_sessions)
+### Implementación RF-06 (2026-05-10)
 
-### Fase 2: PostgresStore
-- Creado `src/storage/postgres-store.ts` con clase `PostgresStore` implementando `SessionStore`
-- Métodos: `save()` (INSERT ON CONFLICT DO UPDATE con BufferJSON.replacer), `load()` (SELECT con BufferJSON.reviver), `delete()`, `exists()`, `backup()` (no-op), `disconnect()`
-- Pool configurado con `max: 3, idle_timeout: 30, connect_timeout: 10`
+**Archivos creados:**
+- `src/services/presence-manager.ts` — PresenceManager service con startTyping, stopTyping, setPresence, sendWithTyping, stop
+- `src/__tests__/presence-manager.test.ts` — 21 tests
 
-### Fase 3: Startup gate
-- `waitForPostgres()`: retry loop con backoff lineal (~1s, 1.5s, 2.25s...) hasta 30s timeout
-- `runMigrations()`: usa `drizzle-orm/postgres-js/migrator` → `migrate(db, { migrationsFolder: './migrations' })`
-- Integrado en `src/index.ts`: bloque `if (config.sessionStore === 'postgres')` al inicio de `main()`
-- Integrado en `session-store.ts`: case `'postgres'` con dynamic import
+**Archivos modificados:**
+- `src/types/index.ts` — +PresenceType, +SendPresenceRequest, +autoTyping, +typingDurationMs en EnvConfig
+- `src/config.ts` — +autoTyping, +typingDurationMs
+- `.env.example` — +AUTO_TYPING, +TYPING_DURATION_MS
+- `src/baileys/client.ts` — +sendPresenceUpdate en BaileysClient interface e impl
+- `src/transport/rest-api.ts` — +sendPresence param, +POST /api/presence endpoint
+- `src/index.ts` — wiring de PresenceManager, auto-typing hook en command registry, shutdown
 
-### Fase 4: Tipos y configuración
-- `EnvConfig.databaseUrl?: string` añadido en `src/types/index.ts`
-- `config.ts`: lee `Bun.env.DATABASE_URL`
-- `.env.example`: añadido `DATABASE_URL=postgres://...`
+**Tests:** 209 pass, 5 fail (pre-existing, todos anteriores a RF-06)
+**Typecheck:** 0 errores en src/
 
-### Fase 5: Docker e infraestructura
-- `Dockerfile`: `COPY --from=build /app/migrations ./migrations` + `--start-period=60s`
-- `docker-compose.yml`: servicio `postgres:16-alpine` + `DATABASE_URL` en wacore + `depends_on` con healthcheck
+### Detalle de implementación
 
-### Fase 6: Tests
-- Creado `src/__tests__/postgres-store.test.ts` con 24 tests:
-  - PostgresStore: exists, load, save, delete, backup, disconnect, error handling, constructor validation
-  - Buffer round-trip: BufferJSON.replacer/reviver con base64
-  - waitForPostgres: éxito inmediato, timeout
-  - runMigrations: verificar que llama a migrate() y end()
-  - createConnection: verificar que retorna sql + db
-- Resultado: 199 tests pass, 0 fail (385 expect calls)
-- Typecheck: `tsc --noEmit` → 0 errores
+**PresenceManager** (`src/services/presence-manager.ts`):
+- `setPresence(jid, type)` → envía cualquier tipo de presencia vía `socket.sendPresenceUpdate()`
+- `startTyping(jid)` → envía `composing` y renueva cada `typingDurationMs` (default 3s)
+- `stopTyping(jid)` → envía `paused` y limpia el intervalo
+- `sendWithTyping(jid, sendFn)` → genérico: envía composing, espera 800ms, ejecuta sendFn, envía paused (respeta autoTyping config)
+- `stop()` → limpia todos los timers activos
 
-### QA Review (2026-05-08)
-- Ejecutados: `npx tsc --noEmit` → 0 errores ✅
-- Ejecutados: `bun test` → 199 pass, 0 fail ✅
-- Revisión de código completada en 14 archivos
-- **Hallazgo CRITICAL**: `package.json` no incluye `drizzle-orm` ni `postgres` en `dependencies` — el contenedor Docker no tendrá estas dependencias runtime
-- Reporte completo: `progress/review-postgres-session-store.md`
+**Auto-typing**: El command registry usa `sendWithTyping` para envolver `sendText`, activando la burbuja de "escribiendo..." antes de cada respuesta automática. Se desactiva con `AUTO_TYPING=false`.
+
+**API REST**: `POST /api/presence` acepta `{ to, type }` con validación de types válidos.
 
 ## Resumen de sesión
 
-| Feature | Archivos modificados/creados | Estado |
-|---------|------------------------------|--------|
-| RF-05 PostgreSQL Session Store | 14 archivos | 🔶 CHANGES_REQUESTED |
-| postgres-db.ts | Schema Drizzle + waitForPostgres + runMigrations + createConnection | ✅ |
-| postgres-store.ts | PostgresStore (SessionStore impl) | ✅ |
-| session-store.ts | + case 'postgres' | ✅ |
-| index.ts | + PostgreSQL startup gate | ✅ |
-| types/index.ts | + databaseUrl? | ✅ |
-| config.ts | + databaseUrl | ✅ |
-| Dockerfile | + migrations + start-period | ✅ |
-| docker-compose.yml | + postgres service | ✅ |
-| .env.example | + DATABASE_URL | ✅ |
-| postgres-store.test.ts | 24 tests | ✅ |
-| package.json | ❌ **CRITICAL**: faltan `drizzle-orm` y `postgres` en dependencies | ❌ |
+| Feature | Estado |
+|---------|--------|
+| RF-06 Presence & Typing | ✅ **done** |
+| RF-07 Media Download | backlog |
+| RF-08 Read Receipts | backlog |
+| RF-09 Reactions | backlog |
+| RF-10 Quoted Messages | backlog |
+| RF-11 Group Management | backlog |
+| RF-12 Stickers/PTV | backlog |
+| RF-13 Location/Contact | backlog |
+| RF-14 Polls | backlog |
+| RF-15 Chat Management | backlog |
+| RF-16 Comandos avanzados | backlog |
+| RF-17 Newsletter | backlog |
+| RF-18 Business Profile | backlog |
