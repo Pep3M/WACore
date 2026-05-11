@@ -39,11 +39,11 @@
 | RF-06.1 | PresenceManager service | done | — | @developer | — | — | done | — |
 | RF-06.2 | API REST presence endpoint | done | — | @developer | — | — | done | — |
 | RF-06.3 | Auto-typing al responder | done | — | @developer | — | — | done | — |
-| RF-07 | Recepción y descarga de medios | backlog | — | — | — | — | — | — |
-| RF-07.1 | MediaDownloader (downloadMediaMessage) | backlog | — | — | — | — | — | — |
-| RF-07.2 | MediaStore en disco | backlog | — | — | — | — | — | — |
-| RF-07.3 | API REST GET /api/media/:id | backlog | — | — | — | — | — | — |
-| RF-07.4 | Media en webhooks y normalized messages | backlog | — | — | — | — | — | — |
+| RF-07 | Recepción y descarga de medios | done | — | @developer | — | — | done | — |
+| RF-07.1 | MediaDownloader (downloadMediaMessage) | done | — | @developer | — | — | done | — |
+| RF-07.2 | MediaStore en disco | done | — | @developer | — | — | done | — |
+| RF-07.3 | API REST GET /api/media/:id | done | — | @developer | — | — | done | — |
+| RF-07.4 | Media en webhooks y normalized messages | done | — | @developer | — | — | done | — |
 | RF-08 | Read Receipts | backlog | — | — | — | — | — | — |
 | RF-08.1 | Marcar mensaje como leído | backlog | — | — | — | — | — | — |
 | RF-08.2 | API REST POST /api/read | backlog | — | — | — | — | — | — |

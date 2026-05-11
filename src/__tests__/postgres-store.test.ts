@@ -11,6 +11,9 @@ const mockConfig = {
   autoTyping: true, typingDurationMs: 3000,
   nodeEnv: 'test',
   databaseUrl: 'postgres://wacore:wacore@localhost:5432/wacore',
+  mediaDir: '/tmp/media',
+  mediaAutoDownload: false,
+  mediaBaseUrl: 'http://localhost:9878',
 };
 const logger = createLogger(mockConfig);
 

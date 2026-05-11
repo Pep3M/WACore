@@ -13,6 +13,8 @@ import { createBaileysClient } from './baileys/client';
 import { createMessageSender } from './services/message-sender';
 import { createCommandRegistry } from './commands/registry';
 import { createPresenceManager } from './services/presence-manager';
+import { DiskMediaStore } from './storage/media-store';
+import { createMediaDownloader } from './services/media-downloader';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -41,6 +43,8 @@ async function main(): Promise<void> {
   const client = await createBaileysClient(config, eventBus, authProvider, sessionStore, logger);
   const messageSender = createMessageSender(client, eventBus, logger);
   const presenceManager = createPresenceManager(client, config, logger);
+  const mediaStore = new DiskMediaStore(config.mediaDir, logger);
+  const mediaDownloader = createMediaDownloader(mediaStore, eventBus, logger, config.mediaAutoDownload, config.mediaBaseUrl);
   const healthMonitor = createHealthMonitor(config.healthPort, logger, config.instanceName);
   const messageRouter = createMessageRouter(eventBus, logger);
   const webhookDispatcher = createWebhookDispatcher(eventBus, config, logger);
@@ -66,7 +70,11 @@ async function main(): Promise<void> {
     (to, type) => presenceManager.setPresence(to, type as any),
     incomingHub,
     sseTransport,
+    mediaStore,
   );
+
+  // ─── Start media downloader ──────────────────────────────────
+  mediaDownloader.start();
 
   // ─── Bridge: connection updates → health monitor ─────────────
   let wasConnected = false;
@@ -126,6 +134,7 @@ async function main(): Promise<void> {
     logger.info('Shutdown signal received', { signal });
     commandRegistry.stop();
     presenceManager.stop();
+    mediaDownloader.stop();
     await client.stop();
     webhookDispatcher.stop();
     messageRouter.stop();

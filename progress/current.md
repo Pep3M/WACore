@@ -1,6 +1,6 @@
 # Sesión actual
 
-- **Feature en curso:** RF-06: Presence & Typing Indicator
+- **Feature en curso:** RF-07: Recepción y descarga de medios
 - **Fase:** implementing → **done**
 - **Inicio:** 2026-05-10
 - **Agente:** @developer
@@ -10,7 +10,7 @@
 ### Implementación RF-06 (2026-05-10)
 
 **Archivos creados:**
-- `src/services/presence-manager.ts` — PresenceManager service con startTyping, stopTyping, setPresence, sendWithTyping, stop
+- `src/services/presence-manager.ts` — PresenceManager service
 - `src/__tests__/presence-manager.test.ts` — 21 tests
 
 **Archivos modificados:**
@@ -21,28 +21,54 @@
 - `src/transport/rest-api.ts` — +sendPresence param, +POST /api/presence endpoint
 - `src/index.ts` — wiring de PresenceManager, auto-typing hook en command registry, shutdown
 
-**Tests:** 209 pass, 5 fail (pre-existing, todos anteriores a RF-06)
-**Typecheck:** 0 errores en src/
+### Implementación RF-07 (2026-05-10)
+
+**Archivos creados:**
+- `src/storage/media-store.ts` — DiskMediaStore: persistencia de archivos en disco con índice JSON
+- `src/services/media-downloader.ts` — MediaDownloader: wrap de `downloadMediaMessage` de baileys, auto-download, emisión de eventos
+- `src/__tests__/media-store.test.ts` — 11 tests (save, getPath, exists, remove, getInfo, getAllIds, persistencia, MIME types)
+- `src/__tests__/media-downloader.test.ts` — 7 tests (non-media skip, download fail, dedup, start/stop, auto-download off/on, event emission)
+
+**Archivos modificados:**
+- `src/types/index.ts` — +MediaStore interface, +MediaDownloadResult + media fields en EnvConfig (mediaDir, mediaAutoDownload, mediaBaseUrl), +MediaDownloadedEvent, +mediaId/downloaded/url en MediaInfo, +'media.downloaded' en WACoreEventMap
+- `src/config.ts` — +mediaDir, +mediaAutoDownload, +mediaBaseUrl
+- `.env.example` — +MEDIA_DIR, +MEDIA_AUTO_DOWNLOAD, +MEDIA_BASE_URL
+- `src/transport/rest-api.ts` — +mediaStore param, +GET /api/media/:id, +GET /api/media endpoints
+- `src/transport/webhook-dispatcher.ts` — +suscripción a 'media.downloaded' event
+- `src/core/message-router.ts` — +mediaId, +downloaded flag en extractMedia
+- `src/index.ts` — wiring de DiskMediaStore, MediaDownloader, auto-download start, shutdown
+- 16 archivos de test actualizados con los 3 nuevos campos de config
+
+**Tests:** 229 pass, 5 fail (pre-existing)
+**TypeScript:** 0 errores en src/
 
 ### Detalle de implementación
 
-**PresenceManager** (`src/services/presence-manager.ts`):
-- `setPresence(jid, type)` → envía cualquier tipo de presencia vía `socket.sendPresenceUpdate()`
-- `startTyping(jid)` → envía `composing` y renueva cada `typingDurationMs` (default 3s)
-- `stopTyping(jid)` → envía `paused` y limpia el intervalo
-- `sendWithTyping(jid, sendFn)` → genérico: envía composing, espera 800ms, ejecuta sendFn, envía paused (respeta autoTyping config)
-- `stop()` → limpia todos los timers activos
+**DiskMediaStore** (`src/storage/media-store.ts`):
+- Almacena archivos en `mediaDir/<mediaId>.<ext>`
+- Índice persistente en `_index.json` con metadatos (mimetype, filename, size, downloadedAt)
+- `save()` / `getPath()` / `exists()` / `remove()` / `getInfo()` / `getAllIds()`
+- Mapeo de extensiones conocidas a MIME types (jpg→image/jpeg, mp4→video/mp4, etc.)
 
-**Auto-typing**: El command registry usa `sendWithTyping` para envolver `sendText`, activando la burbuja de "escribiendo..." antes de cada respuesta automática. Se desactiva con `AUTO_TYPING=false`.
+**MediaDownloader** (`src/services/media-downloader.ts`):
+- `download(raw)` → descarga usando `downloadMediaMessage` de baileys, guarda en MediaStore
+- Auto-download: se suscribe a `message` event, descarga imágenes/video/audio/documento automáticamente
+- Dedup: evita descargar el mismo mediaId dos veces
+- Emite `media.downloaded` event con mediaId, filePath, extension, size, messageId
+- `getPath(mediaId)` → lookup en store
 
-**API REST**: `POST /api/presence` acepta `{ to, type }` con validación de types válidos.
+**API REST**: `GET /api/media/:id` sirve el archivo, `GET /api/media` lista todos los media disponibles.
+
+**Webhook**: Cuando `WEBHOOK_EVENTS` incluye `media` o `media.downloaded`, envía el evento de descarga completada.
+
+**NormalizedMessage**: `media.mediaId` y `media.downloaded` se propagan desde el router de mensajes.
 
 ## Resumen de sesión
 
 | Feature | Estado |
 |---------|--------|
 | RF-06 Presence & Typing | ✅ **done** |
-| RF-07 Media Download | backlog |
+| RF-07 Media Download | ✅ **done** |
 | RF-08 Read Receipts | backlog |
 | RF-09 Reactions | backlog |
 | RF-10 Quoted Messages | backlog |

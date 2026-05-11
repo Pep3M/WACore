@@ -36,7 +36,7 @@ export function createMessageRouter(eventBus: EventBus, logger: Logger): Message
         type,
         body: extractBody(raw, type),
         quotedMessage: extractQuoted(raw),
-        media: extractMedia(raw, type),
+        media: extractMedia(raw, type, raw.key?.id),
       };
     } catch (err) {
       logger.error('Failed to normalize message', { error: String(err) });
@@ -99,13 +99,14 @@ function extractQuoted(raw: any): NormalizedMessage['quotedMessage'] {
   };
 }
 
-function extractMedia(raw: any, type: MessageType): NormalizedMessage['media'] {
+function extractMedia(raw: any, type: MessageType, messageId?: string): NormalizedMessage['media'] {
   const msg = raw.message ?? {};
+  const base = { mediaId: messageId, downloaded: false };
   switch (type) {
-    case 'image': return { mimetype: msg.imageMessage?.mimetype ?? 'image/jpeg', caption: msg.imageMessage?.caption };
-    case 'video': return { mimetype: msg.videoMessage?.mimetype ?? 'video/mp4', caption: msg.videoMessage?.caption };
-    case 'document': return { mimetype: msg.documentMessage?.mimetype ?? 'application/octet-stream', filename: msg.documentMessage?.fileName, caption: msg.documentMessage?.caption };
-    case 'audio': return { mimetype: msg.audioMessage?.mimetype ?? 'audio/ogg' };
+    case 'image': return { ...base, mimetype: msg.imageMessage?.mimetype ?? 'image/jpeg', caption: msg.imageMessage?.caption, filename: msg.imageMessage?.fileName };
+    case 'video': return { ...base, mimetype: msg.videoMessage?.mimetype ?? 'video/mp4', caption: msg.videoMessage?.caption, filename: msg.videoMessage?.fileName };
+    case 'document': return { ...base, mimetype: msg.documentMessage?.mimetype ?? 'application/octet-stream', filename: msg.documentMessage?.fileName, caption: msg.documentMessage?.caption };
+    case 'audio': return { ...base, mimetype: msg.audioMessage?.mimetype ?? 'audio/ogg', filename: msg.audioMessage?.fileName };
     default: return null;
   }
 }

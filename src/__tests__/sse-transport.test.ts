@@ -12,6 +12,9 @@ const mockConfig = {
   webhookRetryCount: 0, webhookRetryDelay: 0, connectOnStartup: false,
   qrTimeout: 60000, nodeEnv: 'test', autoTyping: true, typingDurationMs: 3000, pollingEnabled: false, sseEnabled: false,
   messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
+  mediaDir: '/tmp/media',
+  mediaAutoDownload: false,
+  mediaBaseUrl: 'http://localhost:9878',
 };
 
 const logger = createLogger(mockConfig);

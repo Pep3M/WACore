@@ -135,6 +135,13 @@ export function createWebhookDispatcher(
         }
       }
 
+      if (allowedEvents.has('media') || allowedEvents.has('media.downloaded')) {
+        eventBus.on('media.downloaded', (data) => {
+          if (!active) return;
+          deliver(createPayload('media.downloaded', data as unknown as Record<string, unknown>));
+        });
+      }
+
       eventBus.on('connection.update', (data) => {
         if (!active || !allowedEvents.has('connection')) return;
         deliver(createPayload('connection', data as unknown as Record<string, unknown>));

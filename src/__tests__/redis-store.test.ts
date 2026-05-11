@@ -9,6 +9,9 @@ const mockConfig = {
   qrTimeout: 60000,
   pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
   nodeEnv: 'test', autoTyping: true, typingDurationMs: 3000, redisUrl: 'redis://localhost:6379',
+  mediaDir: '/tmp/media',
+  mediaAutoDownload: false,
+  mediaBaseUrl: 'http://localhost:9878',
 };
 const logger = createLogger(mockConfig);
 

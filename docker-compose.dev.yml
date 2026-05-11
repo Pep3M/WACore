@@ -34,6 +34,7 @@ services:
     image: oven/bun:1.2
     container_name: wacore-front
     working_dir: /app
+    user: "${UID:-1000}:${GID:-1000}"
     command: sh -c "bun install && bun run dev -- --host"
     environment:
       - VITE_API_KEY=${API_KEY:-dev-api-key-123}
@@ -43,6 +44,7 @@ services:
       - "5175:5173"
     volumes:
       - ./front:/app
+      - /app/node_modules
     depends_on:
       - wacore
     restart: unless-stopped

@@ -1,7 +1,9 @@
 import type { Application, Request, Response, NextFunction } from 'express';
 import express from 'express';
+import { existsSync } from 'fs';
+import { extname, join } from 'path';
 import type { Logger } from '../utils/logger';
-import type { EnvConfig, SendMessageRequest, SendMediaRequest, SendPresenceRequest, ApiResponse, PollMessagesResponse } from '../types';
+import type { EnvConfig, SendMessageRequest, SendMediaRequest, SendPresenceRequest, ApiResponse, PollMessagesResponse, MediaStore } from '../types';
 import type { IncomingMessageHub } from '../core/incoming-message-hub';
 import type { SSETransport } from './sse-transport';
 
@@ -24,6 +26,7 @@ export function createRestApi(
   sendPresence?: (to: string, type: string) => Promise<void>,
   incomingHub?: IncomingMessageHub,
   sseTransport?: SSETransport,
+  mediaStore?: MediaStore,
 ): RestApi {
   if (!config.apiKey) {
     return {
@@ -169,6 +172,35 @@ export function createRestApi(
       res.status(500).json({ success: false, error: String(err) });
     }
   });
+
+  if (mediaStore) {
+    app.get('/api/media/:id', (req: Request, res: Response) => {
+      const id = req.params.id;
+      if (!id || Array.isArray(id)) {
+        res.status(400).json({ success: false, error: 'Invalid media ID' });
+        return;
+      }
+      const filePath = mediaStore!.getPath(id);
+      if (!filePath || !existsSync(filePath)) {
+        res.status(404).json({ success: false, error: 'Media not found' });
+        return;
+      }
+      res.sendFile(filePath);
+    });
+
+    app.get('/api/media', (_req: Request, res: Response) => {
+      const allIds = mediaStore!.getAllIds();
+      const files = allIds.map(id => {
+        const p = mediaStore!.getPath(id);
+        return {
+          mediaId: id,
+          url: `/api/media/${id}`,
+          exists: p ? existsSync(p) : false,
+        };
+      });
+      res.json({ success: true, data: { files } });
+    });
+  }
 
   app.get('/api/messages/stream', (req: Request, res: Response) => {
     if (!sseTransport) {

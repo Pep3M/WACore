@@ -2,6 +2,23 @@
 
 // ─── Configuración ────────────────────────────────────────────
 
+export interface MediaStore {
+  save(mediaId: string, buffer: Buffer, extension: string): Promise<string>;
+  getPath(mediaId: string): string | null;
+  exists(mediaId: string): boolean;
+  remove(mediaId: string): Promise<void>;
+  getInfo(mediaId: string): (MediaInfo & { downloadedAt: number }) | null;
+  getAllIds(): string[];
+}
+
+export interface MediaDownloadResult {
+  mediaId: string;
+  filePath: string;
+  extension: string;
+  size: number;
+  messageId?: string;
+}
+
 export interface EnvConfig {
   instanceName: string;
   healthPort: number;
@@ -27,6 +44,9 @@ export interface EnvConfig {
   sseHeartbeatMs: number;
   autoTyping: boolean;
   typingDurationMs: number;
+  mediaDir: string;
+  mediaAutoDownload: boolean;
+  mediaBaseUrl: string;
 }
 
 // ─── Eventos del bus interno ──────────────────────────────────
@@ -77,6 +97,9 @@ export interface MediaInfo {
   filename?: string;
   caption?: string;
   size?: number;
+  mediaId?: string;
+  downloaded?: boolean;
+  url?: string;
 }
 
 export interface AuthStateChangeEvent {
@@ -104,6 +127,14 @@ export interface ErrorEvent {
 
 // ─── Mapa de eventos para el bus ──────────────────────────────
 
+export interface MediaDownloadedEvent {
+  mediaId: string;
+  filePath: string;
+  extension: string;
+  size: number;
+  messageId?: string;
+}
+
 export interface WACoreEventMap {
   'connection.update': ConnectionUpdateEvent;
   'qr': QREvent;
@@ -118,6 +149,7 @@ export interface WACoreEventMap {
   'auth.logged-out': LoggedOutEvent;
   'auth.state-change': AuthStateChangeEvent;
   'webhook.circuit-open': CircuitOpenEvent;
+  'media.downloaded': MediaDownloadedEvent;
   'error': ErrorEvent;
 }
 

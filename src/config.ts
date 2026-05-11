@@ -32,5 +32,8 @@ export function loadConfig(): EnvConfig {
     sseHeartbeatMs: parseInt(process.env.SSE_HEARTBEAT_MS || '30000', 10),
     autoTyping: process.env.AUTO_TYPING !== 'false',
     typingDurationMs: parseInt(process.env.TYPING_DURATION_MS || '3000', 10),
+    mediaDir: process.env.MEDIA_DIR || '/data/media',
+    mediaAutoDownload: process.env.MEDIA_AUTO_DOWNLOAD !== 'false',
+    mediaBaseUrl: process.env.MEDIA_BASE_URL || `http://localhost:${parseInt(process.env.API_PORT || '9878', 10)}`,
   };
 }

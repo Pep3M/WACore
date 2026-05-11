@@ -105,6 +105,26 @@ describe('loadConfig', () => {
     expect(loadConfig().sseEnabled).toBe(true);
   });
 
+  it('loads media config defaults', () => {
+    delete Bun.env.MEDIA_DIR;
+    delete Bun.env.MEDIA_AUTO_DOWNLOAD;
+    delete Bun.env.MEDIA_BASE_URL;
+    const config = loadConfig();
+    expect(config.mediaDir).toBe('/data/media');
+    expect(config.mediaAutoDownload).toBe(true);
+    expect(config.mediaBaseUrl).toBe('http://localhost:9878');
+  });
+
+  it('parses media env vars', () => {
+    Bun.env.MEDIA_DIR = '/custom/media';
+    Bun.env.MEDIA_AUTO_DOWNLOAD = 'false';
+    Bun.env.MEDIA_BASE_URL = 'http://cdn.example.com';
+    const config = loadConfig();
+    expect(config.mediaDir).toBe('/custom/media');
+    expect(config.mediaAutoDownload).toBe(false);
+    expect(config.mediaBaseUrl).toBe('http://cdn.example.com');
+  });
+
   it('throws when WA_INSTANCE_NAME is missing', () => {
     delete Bun.env.WA_INSTANCE_NAME;
     expect(() => loadConfig()).toThrow('WA_INSTANCE_NAME es requerida');

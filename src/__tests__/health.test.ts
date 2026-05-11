@@ -10,6 +10,9 @@ const mockConfig = {
   pollingEnabled: false, sseEnabled: false, messageBufferSize: 1000, messageBufferTtlMs: 300000, sseHeartbeatMs: 30000,
   autoTyping: true, typingDurationMs: 3000,
   nodeEnv: 'test',
+  mediaDir: '/tmp/media',
+  mediaAutoDownload: false,
+  mediaBaseUrl: 'http://localhost:9878',
 };
 const logger = createLogger(mockConfig);
 
