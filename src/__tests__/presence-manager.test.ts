@@ -75,6 +75,75 @@ describe('PresenceManager', () => {
         expect(client.sendPresenceUpdate).toHaveBeenCalledWith('123@s.whatsapp.net', type);
       }
     });
+
+    it('stops active typing timer when setting presence', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+      pm.startTyping('123456');
+
+      await pm.setPresence('123456', 'recording');
+
+      expect(client.sendPresenceUpdate).toHaveBeenLastCalledWith(
+        '123456@s.whatsapp.net', 'recording',
+      );
+      // startTyping sent composing (1), so 3 calls: composing + paused(reset) + recording
+      const calls = (client.sendPresenceUpdate as any).mock.calls;
+      expect(calls.length).toBe(3);
+      expect(calls[0]).toEqual(['123456@s.whatsapp.net', 'composing']);
+      expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'paused']);
+      expect(calls[2]).toEqual(['123456@s.whatsapp.net', 'recording']);
+    });
+
+    it('does not send paused on first setPresence chatstate call', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+
+      await pm.setPresence('123456', 'recording');
+
+      expect(client.sendPresenceUpdate).toHaveBeenCalledTimes(1);
+      expect(client.sendPresenceUpdate).toHaveBeenCalledWith(
+        '123456@s.whatsapp.net', 'recording',
+      );
+    });
+
+    it('sends paused before switching composing to recording', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+
+      await pm.setPresence('123456', 'composing');
+      await pm.setPresence('123456', 'recording');
+
+      const calls = (client.sendPresenceUpdate as any).mock.calls;
+      expect(calls[0]).toEqual(['123456@s.whatsapp.net', 'composing']);
+      expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'paused']);
+      expect(calls[2]).toEqual(['123456@s.whatsapp.net', 'recording']);
+    });
+
+    it('sends paused only once when switching composing to paused', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+
+      await pm.setPresence('123456', 'composing');
+      await pm.setPresence('123456', 'paused');
+
+      const calls = (client.sendPresenceUpdate as any).mock.calls;
+      expect(calls.length).toBe(2);
+      expect(calls[0]).toEqual(['123456@s.whatsapp.net', 'composing']);
+      expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'paused']);
+    });
+
+    it('available after composing does not send paused (different channel)', async () => {
+      const client = createMockClient();
+      const pm = createPresenceManager(client, mockConfig, logger);
+
+      await pm.setPresence('123456', 'composing');
+      await pm.setPresence('123456', 'available');
+
+      const calls = (client.sendPresenceUpdate as any).mock.calls;
+      expect(calls.length).toBe(2);
+      expect(calls[0]).toEqual(['123456@s.whatsapp.net', 'composing']);
+      expect(calls[1]).toEqual(['123456@s.whatsapp.net', 'available']);
+    });
   });
 
   describe('startTyping / stopTyping', () => {

@@ -392,3 +392,65 @@ button:disabled {
   padding: 4px 8px;
   font-size: 0.75rem;
 }
+
+/* ─── Media Type Selector ─── */
+
+.media-type-selector {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.media-type-label {
+  font-size: 0.75rem;
+  color: var(--text2);
+  margin-right: 4px;
+}
+
+.media-type-btn {
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.media-type-btn:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.media-type-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* ─── Message Media Link ─── */
+
+.msg-media-link {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  background: var(--surface2);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.msg-media-link a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.msg-media-link a:hover {
+  text-decoration: underline;
+}
+
+.msg-type {
+  font-size: 0.7rem;
+  color: var(--text2);
+}

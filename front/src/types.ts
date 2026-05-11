@@ -26,6 +26,16 @@ export interface Contact {
   name: string;
 }
 
+export interface MediaInfo {
+  mimetype: string;
+  filename?: string;
+  caption?: string;
+  size?: number;
+  mediaId?: string;
+  downloaded?: boolean;
+  url?: string;
+}
+
 export interface NormalizedMessage {
   id: string;
   from: string;
@@ -36,6 +46,7 @@ export interface NormalizedMessage {
   timestamp: number;
   type: string;
   body: string | null;
+  media?: MediaInfo | null;
 }
 
 export interface PollMessagesData {
@@ -53,4 +64,6 @@ export interface LogData {
   body: string | null;
   timestamp: number;
   type: string;
+  media?: MediaInfo | null;
+  mediaId?: string;
 }

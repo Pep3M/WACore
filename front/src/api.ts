@@ -65,6 +65,13 @@ export async function sendMessage(to: string, text: string) {
   });
 }
 
+export async function sendMedia(to: string, type: string, url: string, caption?: string, filename?: string, mimetype?: string) {
+  return apiFetch<SendData>('/api/send-media', {
+    method: 'POST',
+    body: JSON.stringify({ to, type, url, caption, filename, mimetype }),
+  });
+}
+
 export async function deleteSession() {
   return apiFetch<{ loggedOut: boolean }>('/api/session', {
     method: 'DELETE',

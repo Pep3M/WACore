@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { fetchStatus, fetchContacts, sendMessage, connectSSE, setApiConfig, getApiConfig, getEnvConfig } from './api';
+import { fetchStatus, fetchContacts, sendMessage, sendMedia, connectSSE, setApiConfig, getApiConfig, getEnvConfig } from './api';
 import QRCode from 'qrcode';
-import type { LogData, NormalizedMessage, Contact } from './types';
+import type { LogData, NormalizedMessage, MediaInfo, Contact } from './types';
+
+const MEDIA_TYPES = ['image', 'video', 'document', 'audio'] as const;
+type MediaType = typeof MEDIA_TYPES[number];
 
 function toLogEntry(msg: NormalizedMessage): LogData {
   const ts = typeof msg.timestamp === 'number' ? msg.timestamp
@@ -15,7 +18,20 @@ function toLogEntry(msg: NormalizedMessage): LogData {
     body: msg.body,
     timestamp: ts,
     type: msg.type,
+    media: msg.media ?? null,
+    mediaId: msg.media?.mediaId,
   };
+}
+
+function mediaIcon(type: string): string {
+  switch (type) {
+    case 'image': return '🖼️';
+    case 'video': return '🎬';
+    case 'document': return '📄';
+    case 'audio': return '🎵';
+    case 'reaction': return '💬';
+    default: return '📝';
+  }
 }
 
 export default function App() {
@@ -34,6 +50,10 @@ export default function App() {
   const [sendTo, setSendTo] = useState('');
   const [sendText, setSendText] = useState('');
   const [sendError, setSendError] = useState('');
+  const [sendMediaType, setSendMediaType] = useState<MediaType>('image');
+  const [sendMediaUrl, setSendMediaUrl] = useState('');
+  const [sendMediaCaption, setSendMediaCaption] = useState('');
+  const [sendMediaFilename, setSendMediaFilename] = useState('');
   const [sseKey, setSseKey] = useState(0);
   const echoRef = useRef(false);
 
@@ -119,17 +139,39 @@ export default function App() {
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!sendTo.trim() || !sendText.trim()) return;
+    if (!sendTo.trim()) return;
     setSending(true);
     setSendError('');
-    const res = await sendMessage(sendTo.trim(), sendText.trim());
+
+    const isMedia = sendMediaUrl.trim().length > 0;
+    let res: Awaited<ReturnType<typeof sendMessage>>;
+
+    if (isMedia) {
+      res = await sendMedia(
+        sendTo.trim(),
+        sendMediaType,
+        sendMediaUrl.trim(),
+        sendMediaCaption.trim() || undefined,
+        sendMediaFilename.trim() || undefined,
+      );
+    } else {
+      if (!sendText.trim()) { setSendError('Escribe un texto o proporciona una URL de media'); setSending(false); return; }
+      res = await sendMessage(sendTo.trim(), sendText.trim());
+    }
+
     if (res.success && res.data) {
+      const entryType = isMedia ? sendMediaType : 'text';
+      const entryBody = isMedia ? (sendMediaCaption.trim() || `[${sendMediaType}]`) : sendText.trim();
       setLog(prev => ([{
         id: res.data!.id, direction: 'outgoing' as const, from: sendTo.trim(),
-        phone: sendTo.trim(), pushName: sendTo.trim(), body: sendText.trim(),
-        timestamp: Math.floor(Date.now() / 1000), type: 'text',
+        phone: sendTo.trim(), pushName: sendTo.trim(), body: entryBody,
+        timestamp: Math.floor(Date.now() / 1000), type: entryType,
+        media: isMedia ? { mimetype: '', filename: sendMediaFilename.trim() || undefined, caption: sendMediaCaption.trim() || undefined } : null,
       }, ...prev] as LogData[]).slice(0, 500));
       setSendText('');
+      setSendMediaUrl('');
+      setSendMediaCaption('');
+      setSendMediaFilename('');
     } else {
       setSendError(res.error || 'Error al enviar');
     }
@@ -251,9 +293,18 @@ export default function App() {
                   <span className="msg-direction">{entry.direction === 'incoming' ? '←' : '→'}</span>
                   <span className="msg-sender">{entry.pushName}</span>
                   <span className="msg-phone">{entry.phone}</span>
+                  <span className="msg-type">{mediaIcon(entry.type)} {entry.type}</span>
                   <span className="msg-time">{new Date(entry.timestamp * 1000).toLocaleTimeString()}</span>
                 </div>
                 <div className="msg-body">{entry.body || `[${entry.type}]`}</div>
+                {entry.media && entry.media.mediaId && (
+                  <div className="msg-media-link">
+                    <a href={`/api/media/${entry.media.mediaId}`} target="_blank" rel="noopener noreferrer" onClick={e => { e.preventDefault(); window.open(`/api/media/${entry.media.mediaId}`, '_blank'); }}>
+                      📎 {entry.media.filename || `${entry.media.mediaId}.${entry.media.mimetype?.split('/')[1] || 'bin'}`}
+                    </a>
+                    {entry.media.downloaded ? ' ✅' : ' ⏳'}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -263,10 +314,39 @@ export default function App() {
           <div className="panel-header"><h2>Enviar mensaje</h2></div>
           <form onSubmit={handleSend} className="send-form">
             <label>Destino:<input type="text" placeholder="5215512345678" value={sendTo} onChange={e => setSendTo(e.target.value)} /></label>
-            <label>Mensaje:<textarea placeholder="..." value={sendText} onChange={e => setSendText(e.target.value)} rows={3} /></label>
+
+            <div className="media-type-selector">
+              <span className="media-type-label">Tipo:</span>
+              {MEDIA_TYPES.map(t => (
+                <button key={t} type="button" className={`media-type-btn ${sendMediaType === t ? 'active' : ''}`} onClick={() => setSendMediaType(t)}>
+                  {mediaIcon(t)} {t}
+                </button>
+              ))}
+              <button type="button" className={`media-type-btn ${sendMediaUrl === '' ? 'active' : ''}`} onClick={() => { setSendMediaUrl(''); setSendMediaCaption(''); setSendMediaFilename(''); }}>
+                📝 Texto
+              </button>
+            </div>
+
+            <label>Media URL (opcional):
+              <input type="text" placeholder={sendMediaUrl === '' ? 'https://ejemplo.com/imagen.jpg (dejar vacío para texto)' : 'https://...'} value={sendMediaUrl} onChange={e => setSendMediaUrl(e.target.value)} />
+            </label>
+
+            {sendMediaUrl.trim() && (
+              <>
+                <label>Caption:<input type="text" placeholder="Texto que acompaña al archivo" value={sendMediaCaption} onChange={e => setSendMediaCaption(e.target.value)} /></label>
+                {sendMediaType === 'document' && (
+                  <label>Filename:<input type="text" placeholder="documento.pdf" value={sendMediaFilename} onChange={e => setSendMediaFilename(e.target.value)} /></label>
+                )}
+              </>
+            )}
+
+            {!sendMediaUrl.trim() && (
+              <label>Mensaje:<textarea placeholder="..." value={sendText} onChange={e => setSendText(e.target.value)} rows={3} /></label>
+            )}
+
             {sendError && <div className="form-error">{sendError}</div>}
-            <button type="submit" disabled={sending || !sendTo.trim() || !sendText.trim()} className="btn-primary">
-              {sending ? 'Enviando...' : 'Enviar'}
+            <button type="submit" disabled={sending || !sendTo.trim() || (!sendText.trim() && !sendMediaUrl.trim())} className="btn-primary">
+              {sending ? 'Enviando...' : sendMediaUrl.trim() ? `Enviar ${sendMediaType}` : 'Enviar texto'}
             </button>
           </form>
         </div>
