@@ -62,6 +62,23 @@ backlog → designing → planned → implementing → testing → done
 | `history.md` | Historial de sesiones cerradas (append-only) |
 | `versions.md` | Registro de versiones publicadas (tags Docker) |
 
+## Documentación (`docs/`)
+
+La documentación del proyecto está organizada en ficheros temáticos dentro de `docs/`. Para consultarla, usa el índice en [`docs/index.md`](docs/index.md):
+
+| Archivo | Contenido |
+|---------|-----------|
+| `index.md` | Índice y organización de la documentación |
+| `quick-start.md` | Primeros pasos |
+| `docker.md` | Uso con Docker |
+| `env-vars.md` | Variables de entorno |
+| `whatsapp-connection.md` | Conexión a WhatsApp y QR |
+| `api-rest.md` | API REST completa |
+| `message-reception.md` | SSE, webhook y polling |
+| `session-persistence.md` | Persistencia de sesión |
+| `examples.md` | Ejemplos de uso |
+| `health-check.md` | Health check |
+
 ## Convenciones de código
 
 - TypeScript estricto, sin `any`
