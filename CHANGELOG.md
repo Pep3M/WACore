@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.2] — 2026-05-10
+
+### Added
+- RF-07 Media Download: DiskMediaStore, auto-download, y REST API para descargar medios
+- Interfaz de envío de medios (imagen, video, documento, audio) en frontend
+- Mejoras en Presence Manager
+
+### Changed
+- Documentación reorganizada en ficheros temáticos con índice (`docs/index.md`)
+
 ## [0.3.1] — 2026-05-10
 
 ### Fixed
