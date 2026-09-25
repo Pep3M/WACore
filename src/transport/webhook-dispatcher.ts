@@ -1,6 +1,7 @@
 import type { EventBus } from '../core/event-bus';
 import type { Logger } from '../utils/logger';
 import type { EnvConfig, WebhookPayload, WACoreEventName } from '../types';
+import { MESSAGE_EVENT_NAMES } from '../types';
 import type { CircuitBreaker } from './circuit-breaker';
 import { createCircuitBreaker } from './circuit-breaker';
 import { sleep } from '../utils/retry';
@@ -58,7 +59,7 @@ export function createWebhookDispatcher(
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-WACore-Event': payload.event,
-      'X-WACore-Instance': config.instanceName,
+      'X-WACore-Instance': payload.instanceId,
       'X-WACore-Timestamp': payload.timestamp,
     };
 
@@ -112,7 +113,9 @@ export function createWebhookDispatcher(
   function createPayload(event: string, data: Record<string, unknown>): WebhookPayload {
     return {
       event,
-      instanceId: config.instanceName,
+      // `||` y no `??`: un mensaje sin sesión trae `sessionId: ''`, y un instanceId vacío no
+      // identifica a nadie.
+      instanceId: (data['sessionId'] as string | undefined) || config.instanceName,
       timestamp: new Date().toISOString(),
       data,
     };
@@ -122,15 +125,17 @@ export function createWebhookDispatcher(
     start() {
       active = true;
 
-      if (allowedEvents.has('message')) {
-        const messageEvents: WACoreEventName[] = [
-          'message.text', 'message.image', 'message.video',
-          'message.document', 'message.audio', 'message.reaction',
-        ];
-        for (const eventName of messageEvents) {
+      // Una edición conserva el `id` del mensaje original. Entregada como `message`, el consumidor
+      // la tomaría por un mensaje nuevo del cliente; por eso va aparte y solo a quien la pide.
+      const wantsMessage = allowedEvents.has('message');
+      const wantsEdit = allowedEvents.has('message.edit');
+      if (wantsMessage || wantsEdit) {
+        for (const eventName of MESSAGE_EVENT_NAMES) {
           eventBus.on(eventName, (data) => {
             if (!active) return;
-            deliver(createPayload('message', data as unknown as Record<string, unknown>));
+            const isEdit = (data as { isEdit?: boolean }).isEdit === true;
+            if (isEdit ? !wantsEdit : !wantsMessage) return;
+            deliver(createPayload(isEdit ? 'message.edit' : 'message', data as unknown as Record<string, unknown>));
           });
         }
       }
@@ -151,6 +156,37 @@ export function createWebhookDispatcher(
         if (!active || !allowedEvents.has('qr')) return;
         deliver(createPayload('qr', data as unknown as Record<string, unknown>));
       });
+
+      eventBus.on('presence.contact', (data) => {
+        if (!active || !allowedEvents.has('presence')) return;
+        deliver(createPayload('presence', data as unknown as Record<string, unknown>));
+      });
+
+      eventBus.on('message.status', (data) => {
+        if (!active || !allowedEvents.has('message.status')) return;
+        deliver(createPayload('message.status', data as unknown as Record<string, unknown>));
+      });
+
+      // Llamadas entrantes: de una misma llamada salen varios eventos (offer, accept, reject,
+      // timeout, terminate) con el mismo `id`, para tratarlos como actualizaciones de un registro.
+      eventBus.on('call', (data) => {
+        if (!active || !allowedEvents.has('call')) return;
+        deliver(createPayload('call', data as unknown as Record<string, unknown>));
+      });
+
+      // Histórico al emparejar una línea. Va en eventos propios y nunca como `message`: son
+      // conversaciones de hace meses y un consumidor que las tomara por recién llegadas
+      // contestaría a todas.
+      if (allowedEvents.has('history')) {
+        eventBus.on('message.history', (data) => {
+          if (!active) return;
+          deliver(createPayload('message.history', data as unknown as Record<string, unknown>));
+        });
+        eventBus.on('history.synced', (data) => {
+          if (!active) return;
+          deliver(createPayload('history.synced', data as unknown as Record<string, unknown>));
+        });
+      }
 
       logger.info('Webhook dispatcher started', {
         url: config.webhookUrl,

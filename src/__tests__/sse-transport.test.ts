@@ -163,6 +163,56 @@ describe('SSETransport', () => {
     expect(data()).not.toContain('sse-after');
   });
 
+  it('broadcasts presence.contact events as SSE presence events', async () => {
+    const transport = createSSETransport(hub, bus, logger, 30000);
+    const { res, data } = mockRes();
+    transport.handleConnection({ url: '/api/messages/stream' }, res as unknown as Response);
+
+    bus.emit('presence.contact', {
+      jid: '5493511234567@s.whatsapp.net',
+      isGroup: false,
+      participant: '5493511234567@s.whatsapp.net',
+      presence: 'composing',
+      lastSeen: null,
+      timestamp: Date.now(),
+      sessionId: 'test',
+    });
+    await new Promise(r => setTimeout(r, 30));
+
+    const text = data();
+    expect(text).toContain('event: presence');
+    expect(text).toContain('composing');
+    expect(text).toContain('5493511234567@s.whatsapp.net');
+
+    transport.stop();
+  });
+
+  it('broadcasts message.status events as SSE message.status events', async () => {
+    const transport = createSSETransport(hub, bus, logger, 30000);
+    const { res, data } = mockRes();
+    transport.handleConnection({ url: '/api/messages/stream' }, res as unknown as Response);
+
+    bus.emit('message.status', {
+      messageId: '3EB0ABC123',
+      status: 3,
+      statusLabel: 'delivered',
+      chatJid: '5493511234567@s.whatsapp.net',
+      phone: '5493511234567',
+      isGroup: false,
+      fromMe: true,
+      timestamp: Date.now(),
+      sessionId: 'test',
+    });
+    await new Promise(r => setTimeout(r, 30));
+
+    const text = data();
+    expect(text).toContain('event: message.status');
+    expect(text).toContain('delivered');
+    expect(text).toContain('3EB0ABC123');
+
+    transport.stop();
+  });
+
   it('stop closes all active connections', () => {
     const transport = createSSETransport(hub, bus, logger, 30000);
     const { res: res1 } = mockRes();

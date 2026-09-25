@@ -55,6 +55,47 @@ describe('WebhookDispatcher', () => {
     dispatcher.stop();
   });
 
+  it('delivers message.status ACK events when allowed', async () => {
+    const bus = createEventBus();
+    const cfg = { ...mockConfig, webhookEvents: ['message.status'] };
+    const calls: Array<{ url: string; body: any; headers: Record<string, string> }> = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: any, init: any) => {
+      calls.push({ url: String(url), body: JSON.parse(init.body), headers: init.headers });
+      return new Response('ok', { status: 200 });
+    }) as typeof fetch;
+
+    try {
+      const dispatcher = createWebhookDispatcher(bus, cfg, logger);
+      dispatcher.start();
+
+      bus.emit('message.status', {
+        messageId: '3EB0ABC123',
+        status: 4,
+        statusLabel: 'read',
+        chatJid: '521234567890@s.whatsapp.net',
+        phone: '521234567890',
+        isGroup: false,
+        fromMe: true,
+        timestamp: Date.now(),
+        sessionId: 'acc1:user1',
+        accountId: 'acc1',
+        userId: 'user1',
+      });
+
+      await new Promise(r => setTimeout(r, 20));
+      dispatcher.stop();
+
+      const statusCalls = calls.filter(c => c.body?.event === 'message.status');
+      expect(statusCalls).toHaveLength(1);
+      expect(statusCalls[0].body.data.messageId).toBe('3EB0ABC123');
+      expect(statusCalls[0].body.data.statusLabel).toBe('read');
+      expect(statusCalls[0].headers['X-WACore-Event']).toBe('message.status');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('stops delivering after stop()', async () => {
     const bus = createEventBus();
     const dispatcher = createWebhookDispatcher(bus, mockConfig, logger);

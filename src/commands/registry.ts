@@ -4,7 +4,7 @@ import type { Command, CommandRegistry, NormalizedMessage } from '../types';
 
 export function createCommandRegistry(
   eventBus: EventBus,
-  sendReply: (to: string, text: string) => Promise<string>,
+  sendReply: (to: string, text: string, sessionId?: string) => Promise<string>,
   logger: Logger,
   prefix = '!',
 ): CommandRegistry {
@@ -36,6 +36,10 @@ export function createCommandRegistry(
   }
 
   async function handleMessage(msg: NormalizedMessage): Promise<void> {
+    // Un mensaje propio nunca dispara un comando: escribir `!ping` desde el móvil de la
+    // empresa lanzaría el bot contra uno mismo y la línea acabaría hablando sola.
+    if (msg.fromMe) return;
+
     const body = msg.body;
     if (!body) return;
     if (!body.startsWith(prefix)) return;
@@ -56,7 +60,7 @@ export function createCommandRegistry(
     });
 
     try {
-      const reply = (text: string) => sendReply(msg.from, text);
+      const reply = (text: string) => sendReply(msg.from, text, msg.sessionId);
       await cmd.handler(msg, args, reply);
     } catch (err) {
       logger.error('Command handler error', {

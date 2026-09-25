@@ -44,6 +44,9 @@ function createMockSessionStore(): SessionStore {
 
 let currentSocketHandlers: Map<string, Array<(...args: any[]) => void>>;
 
+/** Las opciones con las que el cliente construyó el socket. Sirve para mirar el adaptador de log. */
+let opcionesDelSocket: any = null;
+
 function simulateBaileysEvent(event: string, ...args: any[]) {
   const list = currentSocketHandlers?.get(event) ?? [];
   for (const handler of list) {
@@ -58,9 +61,10 @@ function resetSocketHandlers() {
 function createMockSocketFactory() {
   resetSocketHandlers();
 
-  return () => ({
+  return (opts?: any) => ({
     ev: {
       on(event: string, handler: (...args: any[]) => void) {
+        opcionesDelSocket = opts ?? opcionesDelSocket;
         const list = currentSocketHandlers.get(event) ?? [];
         list.push(handler);
         currentSocketHandlers.set(event, list);
@@ -75,6 +79,10 @@ function createMockSocketFactory() {
 
 mock.module('baileys', () => ({
   makeWASocket: createMockSocketFactory(),
+  // El cliente la llama al arrancar para resolver la versión de WhatsApp Web. Sin ella en el
+  // doble, bun no encuentra la exportación y **aborta el fichero entero** antes de la primera
+  // prueba, con un SyntaxError que no señala a este sitio.
+  fetchLatestBaileysVersion: async () => ({ version: [2, 3000, 0], isLatest: true }),
   DisconnectReason: {},
   useMultiFileAuthState: async () => ({ state: {}, saveCreds: async () => {} }),
   isLidUser: (jid?: string) => !!jid?.endsWith('@lid'),
@@ -325,7 +333,8 @@ describe('Baileys Integration - Client + Auth + Session Store', () => {
     expect(store.save).toHaveBeenCalledWith({ registrationId: 99 }, {});
   });
 
-  it('debounces rapid saveCreds calls', async () => {
+  it('coalesces rapid saveCreds calls to at most one follow-up write', async () => {
+    // Ver auth.test.ts para el racional: coalescing, no descarte.
     const { createAuthProvider } = await import('../baileys/auth');
     const store = createMockSessionStore();
     const authProvider = await createAuthProvider(store, logger);
@@ -333,9 +342,11 @@ describe('Baileys Integration - Client + Auth + Session Store', () => {
     authProvider.saveCreds();
     authProvider.saveCreds();
     authProvider.saveCreds();
-    await Bun.sleep(0);
+    await authProvider.saveCreds();
 
-    expect(store.save).toHaveBeenCalledTimes(1);
+    const calls = (store.save as any).mock.calls.length;
+    expect(calls).toBeGreaterThanOrEqual(1);
+    expect(calls).toBeLessThanOrEqual(2);
   });
 
   it('emits qr event and updates status via bus', async () => {
@@ -547,7 +558,7 @@ describe('Baileys Integration - Health Monitor', () => {
     health.stop();
   });
 
-  it('hides phoneNumber by default in health endpoint', async () => {
+  it('exposes phoneNumber in health endpoint (contrato v0.3.2)', async () => {
     const health = createHealthMonitor(19978, logger, testConfig.instanceName);
     health.start();
 
@@ -555,7 +566,7 @@ describe('Baileys Integration - Health Monitor', () => {
 
     const res = await fetch('http://localhost:19978/health');
     const body = await res.json() as Record<string, unknown>;
-    expect(body.phoneNumber).toBeUndefined();
+    expect(body.phoneNumber).toBe('5215551234567');
 
     health.stop();
   });
@@ -650,5 +661,322 @@ describe('Baileys Integration - Message Router Edge Cases', () => {
 
     router.stop();
     await client.stop();
+  });
+});
+
+/**
+ * Un código QR que nadie escanea no puede tener a una línea reintentando para siempre.
+ *
+ * Baileys agota los códigos (`QR refs attempts ended`), cierra con `timedOut` —que sí es un
+ * motivo reintentable— y vuelve a empezar. En dev se vio el intento 74, con 1.767 eventos `qr`
+ * atascados que no le importaban a nadie.
+ *
+ * Y la otra mitad, que es la que no se puede romper: una sesión **con** credenciales reintenta
+ * igual que siempre. Rendirse ahí fue lo que dejó una línea pidiendo QR por un corte de DNS de
+ * tres minutos, con las credenciales intactas.
+ */
+describe('Baileys — el QR sin escanear se rinde, la sesión emparejada no', () => {
+  const cierrePorTiempo = {
+    connection: 'close',
+    lastDisconnect: { error: { output: { statusCode: 408 } } },
+  };
+
+  function almacenConCredenciales(): SessionStore {
+    const datos = {
+      creds: { registered: true, me: { id: '34600000000:1@s.whatsapp.net' } },
+      keys: {},
+    };
+    return {
+      save: mock(async () => {}),
+      load: mock(async () => datos),
+      delete: mock(async () => {}),
+      exists: mock(async () => true),
+      backup: mock(async () => {}),
+    } as unknown as SessionStore;
+  }
+
+  afterEach(() => {
+    resetSocketHandlers();
+  });
+
+  it('sin emparejar, agotadas las rondas se queda en disconnected y deja de reintentar', async () => {
+    const { createBaileysClient } = await import('../baileys/client');
+    const { createAuthProvider } = await import('../baileys/auth');
+
+    const cfg = { ...testConfig, qrMaxRounds: 2 };
+    const bus = createEventBus();
+    const store = createMockSessionStore();   // load() → null: nunca se emparejó
+    const authProvider = await createAuthProvider(store, logger);
+    const client = await createBaileysClient(cfg, bus, authProvider, store, logger);
+    await client.start();
+
+    const estados: string[] = [];
+    bus.on('connection.update', (u: any) => estados.push(u.status));
+
+    simulateBaileysEvent('connection.update', cierrePorTiempo);
+    expect(estados.at(-1)).toBe('connecting');
+
+    simulateBaileysEvent('connection.update', cierrePorTiempo);
+    expect(estados.at(-1)).toBe('disconnected');
+
+    await client.stop();
+  });
+
+  /**
+   * Que otro cliente nos eche no puede convertirse en una guerra de reconexiones.
+   *
+   * `connectionReplaced` (440) significa que alguien más tomó la sesión: otra pestaña de WhatsApp
+   * Web, otra herramienta, otro servidor con estas credenciales. Estaba clasificado como una caída
+   * de red, así que se reconectaba siempre — y como cada conexión efímera reiniciaba el contador de
+   * reintentos, la pelea no terminaba nunca: varias reconexiones **por segundo**, machacando a
+   * WhatsApp (motivo habitual de bloqueo de un número) y dejando la línea parpadeando en el consumidor
+   * entre «Conectada» y «Generando código».
+   */
+  it('si otro cliente nos echa varias veces, se deja de pelear por la sesión', async () => {
+    const { createBaileysClient } = await import('../baileys/client');
+    const { createAuthProvider } = await import('../baileys/auth');
+
+    const bus = createEventBus();
+    const store = almacenConCredenciales();
+    const authProvider = await createAuthProvider(store, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
+    await client.start();
+
+    const estados: string[] = [];
+    bus.on('connection.update', (u: any) => estados.push(u.status));
+
+    const reemplazada = {
+      connection: 'close',
+      lastDisconnect: { error: { output: { statusCode: 440 } } },
+    };
+
+    // Gana la sesión y se la quitan, tres veces seguidas. Ninguna conexión aguanta.
+    for (let i = 0; i < 3; i++) {
+      simulateBaileysEvent('connection.update', { connection: 'open' });
+      simulateBaileysEvent('connection.update', reemplazada);
+    }
+
+    expect(estados.at(-1)).toBe('disconnected');
+
+    await client.stop();
+  });
+
+  it('un reemplazo suelto no tumba la línea', async () => {
+    const { createBaileysClient } = await import('../baileys/client');
+    const { createAuthProvider } = await import('../baileys/auth');
+
+    const bus = createEventBus();
+    const store = almacenConCredenciales();
+    const authProvider = await createAuthProvider(store, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
+    await client.start();
+
+    const estados: string[] = [];
+    bus.on('connection.update', (u: any) => estados.push(u.status));
+
+    // Alguien abrió WhatsApp Web un momento y lo cerró: se reintenta, como siempre.
+    simulateBaileysEvent('connection.update', { connection: 'open' });
+    simulateBaileysEvent('connection.update', {
+      connection: 'close',
+      lastDisconnect: { error: { output: { statusCode: 440 } } },
+    });
+
+    expect(estados.at(-1)).not.toBe('disconnected');
+
+    await client.stop();
+  });
+
+  it('emparejada, sigue reintentando por muchas veces que se caiga', async () => {
+    const { createBaileysClient } = await import('../baileys/client');
+    const { createAuthProvider } = await import('../baileys/auth');
+
+    const cfg = { ...testConfig, qrMaxRounds: 1 };
+    const bus = createEventBus();
+    const store = almacenConCredenciales();
+    const authProvider = await createAuthProvider(store, logger);
+    const client = await createBaileysClient(cfg, bus, authProvider, store, logger);
+    await client.start();
+
+    const avisos: string[] = [];
+    const warnOriginal = logger.warn.bind(logger);
+    (logger as { warn: (m: string, c?: Record<string, unknown>) => void }).warn = (m, c) => {
+      avisos.push(m);
+      warnOriginal(m, c);
+    };
+
+    try {
+      for (let i = 0; i < 4; i++) simulateBaileysEvent('connection.update', cierrePorTiempo);
+    } finally {
+      (logger as { warn: (m: string, c?: Record<string, unknown>) => void }).warn = warnOriginal;
+    }
+
+    // Con `qrMaxRounds: 1`, una sesión sin credenciales se habría rendido en el primer cierre.
+    expect(avisos).not.toContain('QR abandonado: nadie lo escaneó, la sesión deja de reintentar');
+
+    await client.stop();
+  });
+});
+
+/**
+ * El puente entre el log de Baileys y el nuestro.
+ *
+ * Baileys habla pino, y pino pone el objeto primero y el texto después. El adaptador se quedaba
+ * solo con el primer argumento, así que en producción los avisos salían así:
+ *
+ *     {"levelName":"warn","msg":"{\"msgId\":\"31120.38820-210\"}","source":"baileys"}
+ *
+ * El texto que faltaba era `timed out waiting for message`, y era la única pista de que WhatsApp
+ * llevaba horas sin contestar a las consultas del catálogo. Un aviso mudo es peor que ninguno:
+ * ocupa sitio en el log y no dice nada.
+ */
+describe('El adaptador de log de Baileys', () => {
+  it('conserva el texto del mensaje, no solo el objeto', async () => {
+    const { createBaileysClient } = await import('../baileys/client');
+    const { createAuthProvider } = await import('../baileys/auth');
+    const bus = createEventBus();
+    const store = createMockSessionStore();
+    const authProvider = await createAuthProvider(store, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
+    await client.start();
+
+    const escrito: string[] = [];
+    const espia = { ...logger, warn: (msg: string) => { escrito.push(msg); } };
+    const puente = opcionesDelSocket?.logger;
+
+    expect(puente).toBeDefined();
+
+    // Se llama al puente como lo llama Baileys: objeto delante, texto detrás.
+    const original = (logger as any).warn;
+    (logger as any).warn = espia.warn;
+    try {
+      puente.warn({ msgId: '31120.38820-210' }, 'timed out waiting for message');
+    } finally {
+      (logger as any).warn = original;
+    }
+
+    expect(escrito).toHaveLength(1);
+    expect(escrito[0]).toContain('timed out waiting for message');
+    expect(escrito[0]).toContain('31120.38820-210');
+  });
+
+  it('un mensaje suelto, sin objeto, sale tal cual', async () => {
+    const puente = opcionesDelSocket?.logger;
+    const escrito: string[] = [];
+    const original = (logger as any).info;
+    (logger as any).info = (msg: string) => { escrito.push(msg); };
+    try {
+      puente.info('WhatsApp connected');
+    } finally {
+      (logger as any).info = original;
+    }
+
+    expect(escrito).toEqual(['WhatsApp connected']);
+  });
+});
+
+/**
+ * Rearrancar una línea a la que WhatsApp le ha cerrado la sesión.
+ *
+ * Un `401 loggedOut` significa que la sesión ya no existe al otro lado, y volver a intentarlo con
+ * las mismas credenciales no puede funcionar. Peor: **impide que se pida un código**, porque
+ * Baileys solo emite el evento `qr` cuando el estado de autenticación viene vacío. La línea se
+ * quedaba en un bucle de `logging in…` → `401` que `whatsapp:check-sessions` relanzaba cada cinco
+ * minutos, sin QR y sin salida; la única cura era reiniciar WACore entero.
+ *
+ * La limpieza existía, pero solo en `connect()`. Las sesiones se rearrancan por `start()` —es lo
+ * que llama `sessionManager.create()` al encontrar una línea caída en el pool—, así que por ese
+ * camino no se limpiaba nunca.
+ */
+describe('rearranque de una sesión cerrada por WhatsApp', () => {
+  it('start() tira las credenciales muertas para que vuelva a haber QR', async () => {
+    const { createBaileysClient } = await import('../baileys/client');
+    const { createAuthProvider } = await import('../baileys/auth');
+    const bus = createEventBus();
+    const store = createMockSessionStore();
+    const authProvider = await createAuthProvider(store, logger);
+
+    let reseteos = 0;
+    const resetOriginal = authProvider.reset;
+    authProvider.reset = () => { reseteos++; resetOriginal(); };
+
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
+    await client.start();
+    expect(reseteos).toBe(0);
+
+    simulateBaileysEvent('connection.update', {
+      connection: 'close',
+      lastDisconnect: { error: { output: { statusCode: 401 } } },
+    });
+    expect(client.getConnectionStatus()).toBe('logged-out');
+
+    // Exactamente lo que hace `sessionManager.create()` con una línea caída del pool.
+    await client.start();
+    expect(reseteos).toBe(1);
+
+    await client.stop();
+  });
+
+  it('no las tira si la línea solo estaba caída, no cerrada', async () => {
+    const { createBaileysClient } = await import('../baileys/client');
+    const { createAuthProvider } = await import('../baileys/auth');
+    const bus = createEventBus();
+    const store = createMockSessionStore();
+    const authProvider = await createAuthProvider(store, logger);
+
+    let reseteos = 0;
+    const resetOriginal = authProvider.reset;
+    authProvider.reset = () => { reseteos++; resetOriginal(); };
+
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
+    await client.start();
+    await client.stop();
+
+    // `stop()` deja la sesión en `disconnected`. Sus credenciales siguen valiendo: tirarlas aquí
+    // obligaría a reescanear un QR por un reinicio del contenedor.
+    await client.start();
+    expect(reseteos).toBe(0);
+
+    await client.stop();
+  });
+
+  /**
+   * `start()` se llama más de una vez sobre el mismo cliente, y cada llamada creaba un
+   * `setInterval` sin retirar el anterior. Con `whatsapp:check-sessions` pidiéndolo cada cinco
+   * minutos, las subidas de pre-claves se multiplicaban solas.
+   */
+  it('start() no deja vivo el temporizador de la vez anterior', async () => {
+    const { createBaileysClient } = await import('../baileys/client');
+    const { createAuthProvider } = await import('../baileys/auth');
+    const bus = createEventBus();
+    const store = createMockSessionStore();
+    const authProvider = await createAuthProvider(store, logger);
+    const client = await createBaileysClient(testConfig, bus, authProvider, store, logger);
+
+    const setOriginal = globalThis.setInterval;
+    const clearOriginal = globalThis.clearInterval;
+    const creados: unknown[] = [];
+    const limpiados: unknown[] = [];
+
+    globalThis.setInterval = ((fn: any, ms: any) => {
+      const id = setOriginal(fn, ms);
+      creados.push(id);
+      return id;
+    }) as typeof globalThis.setInterval;
+    globalThis.clearInterval = ((id: any) => {
+      limpiados.push(id);
+      return clearOriginal(id);
+    }) as typeof globalThis.clearInterval;
+
+    try {
+      await client.start();
+      await client.start();
+
+      expect(creados).toHaveLength(2);
+      expect(limpiados).toContain(creados[0]);
+    } finally {
+      await client.stop();
+      globalThis.setInterval = setOriginal;
+      globalThis.clearInterval = clearOriginal;
+    }
   });
 });
