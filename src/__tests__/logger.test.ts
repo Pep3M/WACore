@@ -2,7 +2,7 @@ import { describe, expect, it, mock } from 'bun:test';
 import { createLogger } from '../utils/logger';
 
 const mockConfig = {
-  instanceName: 'test', healthPort: 9877, apiPort: 9878, logLevel: 'debug' as const,
+  instanceName: 'test', healthPort: 9877, apiPort: 9878, logLevel: 'debug' as const, logFormat: 'json' as const,
   sessionStore: 'file' as const, sessionDir: '/tmp', webhookEvents: [],
   webhookRetryCount: 0, webhookRetryDelay: 0, connectOnStartup: false,
   qrTimeout: 60000,

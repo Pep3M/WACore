@@ -34,10 +34,17 @@ function hydrate<T>(data: T): T {
 async function buildState(sessionStore: SessionStore, logger: Logger): Promise<AuthState & { save: () => Promise<void> }> {
   const existing = await sessionStore.load();
 
-  const creds: Record<string, unknown> = existing
+  const initialCreds: Record<string, unknown> = existing
     ? hydrate(existing.creds as Record<string, unknown>)
     : (initAuthCreds() as unknown as Record<string, unknown>);
   const keyData: Record<string, unknown> = hydrate((existing?.keys as Record<string, unknown>) ?? {});
+
+  // Contenedor mutable: los saves leen creds/keys frescos aquí en cada flush,
+  // así reasignaciones de `state.creds` (baileys, tests) se persisten correctamente.
+  const box: { creds: Record<string, unknown>; keys: Record<string, unknown> } = {
+    creds: initialCreds,
+    keys: keyData,
+  };
 
   if (existing) {
     logger.info('Auth state loaded from store');
@@ -45,73 +52,96 @@ async function buildState(sessionStore: SessionStore, logger: Logger): Promise<A
     logger.info('Generated fresh authentication credentials');
   }
 
-  let persistQueue: Promise<void> = Promise.resolve();
+  // Coalescing writer: al menos un save posterior siempre corre, pero saves
+  // consecutivos mientras uno está en vuelo se fusionan en una única escritura
+  // final que ve el estado más reciente (no se pierde nada, no se martillea).
+  let inFlight: Promise<void> | null = null;
+  let pending: Promise<void> | null = null;
 
-  function enqueueSave(): void {
-    persistQueue = persistQueue.then(async () => {
+  function enqueueSave(): Promise<void> {
+    if (pending) return pending;
+    if (inFlight) {
+      pending = inFlight.then(async () => {
+        pending = null;
+        await runSave();
+      });
+      return pending;
+    }
+    return runSave();
+  }
+
+  async function runSave(): Promise<void> {
+    const task = (async () => {
       try {
-        await sessionStore.save(creds, keyData);
+        await sessionStore.save(box.creds, box.keys);
       } catch (err) {
         logger.error('Failed to save auth state', { error: String(err) });
       }
-    });
+    })();
+    inFlight = task;
+    try {
+      await task;
+    } finally {
+      if (inFlight === task) inFlight = null;
+    }
   }
 
   const keys = {
     async get(type: string, ids: string[]): Promise<Record<string, unknown>> {
-      if (ids.length === 0) return keyData;
+      const kd = box.keys;
+      if (ids.length === 0) return kd;
 
       const result: Record<string, unknown> = {};
 
-      // baileys stores types as { [type]: { [id]: value } }
-      // e.g. 'pre-key': { 968: keyPair, 969: keyPair }
-      // e.g. 'session': { jid: sessionData }
-      const typeData = keyData[type];
+      const typeData = kd[type];
       if (typeof typeData === 'object' && typeData !== null) {
         for (const id of ids) {
           const val = (typeData as Record<string, unknown>)[id];
-          if (val !== undefined) {
-            result[id] = val;
-          }
+          if (val !== undefined) result[id] = val;
         }
         if (Object.keys(result).length > 0) return result;
       }
 
-      // Flat fallback for legacy or non-nested types
       for (const id of ids) {
         const key = `${type}-${id}`;
-        if (key in keyData) result[id] = keyData[key];
-        if (id in keyData) result[id] = keyData[id];
+        if (key in kd) result[id] = kd[key];
+        if (id in kd) result[id] = kd[id];
       }
 
       return result;
     },
 
     async set(data: Record<string, unknown>): Promise<void> {
+      const kd = box.keys;
       for (const [k, v] of Object.entries(data)) {
-        const existing = keyData[k];
+        const existing = kd[k];
         if (typeof v === 'object' && v !== null && !Array.isArray(v) && typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
-          // Merge nested types (pre-key, session, tctoken, etc.) instead of replacing
           Object.assign(existing, v);
         } else {
-          keyData[k] = v;
+          kd[k] = v;
         }
       }
+      // Baileys no siempre emite creds.update tras keys.set; encolamos un flush
+      // para no depender de ese evento y evitar perder claves entre reinicios.
+      enqueueSave();
     },
   };
 
-  return {
-    creds,
+  const state: AuthState & { save: () => Promise<void> } = {
+    get creds() { return box.creds; },
+    set creds(v: Record<string, unknown>) { box.creds = v; },
 
     keys,
 
     async save(): Promise<void> {
-      enqueueSave();
-      await persistQueue;
+      await enqueueSave();
     },
 
-    _keyData: keyData,
+    get _keyData() { return box.keys; },
+    set _keyData(v: Record<string, unknown>) { box.keys = v; },
   };
+
+  return state;
 }
 
 export async function createAuthProvider(
@@ -119,13 +149,7 @@ export async function createAuthProvider(
   logger: Logger,
 ): Promise<AuthProvider> {
   const state = await buildState(sessionStore, logger);
-  let saveScheduled = false;
   let valid = true;
-
-  async function persist(): Promise<void> {
-    const allKeys = await state.keys.get('', []);
-    await sessionStore.save(state.creds, allKeys);
-  }
 
   return {
     state,
@@ -146,16 +170,8 @@ export async function createAuthProvider(
     },
 
     async saveCreds() {
-      if (!valid || saveScheduled) return;
-      saveScheduled = true;
-
-      try {
-        await persist();
-      } catch (err) {
-        logger.error('Failed to save auth state', { error: String(err) });
-      } finally {
-        saveScheduled = false;
-      }
+      if (!valid) return;
+      await state.save();
     },
   };
 }

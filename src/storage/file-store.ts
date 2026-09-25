@@ -15,8 +15,9 @@ export class FileStore implements SessionStore {
   private baseDir: string;
   private logger: Logger;
 
-  constructor(config: EnvConfig, logger: Logger) {
-    this.baseDir = `${config.sessionDir}/${config.instanceName}`;
+  constructor(config: EnvConfig, logger: Logger, options?: { instanceName?: string }) {
+    const name = options?.instanceName ?? config.instanceName;
+    this.baseDir = `${config.sessionDir}/${name}`;
     this.logger = logger;
     this.ensureDir();
   }

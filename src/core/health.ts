@@ -7,6 +7,11 @@ export interface HealthMonitor {
   updateConnection(status: ConnectionStatus, phoneNumber?: string): void;
   incrementReconnections(): void;
   getStatus(): HealthStatus;
+  /**
+   * Contadores adicionales que se publican en `/health` bajo `transport` (hoy, los del pool de
+   * Postgres). Se inyecta porque los servicios que los llevan se construyen después.
+   */
+  setTransportStats(provider: () => Record<string, unknown>): void;
   start(): void;
   stop(): void;
 }
@@ -19,6 +24,7 @@ export function createHealthMonitor(
   let connection: ConnectionStatus = 'disconnected';
   let phoneNumber: string | null = null;
   let reconnections = 0;
+  let transportStats: (() => Record<string, unknown>) | null = null;
   const startTime = Date.now();
   const app: Application = express();
   let server: ReturnType<typeof app.listen> | null = null;
@@ -26,8 +32,8 @@ export function createHealthMonitor(
   app.get('/health', (_req: Request, res: Response) => {
     const status: HealthStatus['status'] =
       connection === 'connected' ? 'healthy'
-      : connection === 'failed' || connection === 'logged-out' ? 'unhealthy'
-      : 'degraded';
+      : connection === 'connecting' || connection === 'awaiting-qr' ? 'degraded'
+      : 'unhealthy';
 
     const health: HealthStatus = {
       status,
@@ -37,12 +43,22 @@ export function createHealthMonitor(
       reconnections,
     };
 
+    let transport: Record<string, unknown> | undefined;
+    try {
+      transport = transportStats?.();
+    } catch {
+      // Una sonda de salud nunca puede devolver un 500 por un contador: eso convertiría un
+      // detalle informativo en un contenedor marcado como muerto.
+      transport = { error: 'unavailable' };
+    }
+
     res.json({
       status: health.status,
       connection: health.connection,
-      ...(health.phoneNumber ? { phoneNumber: health.phoneNumber } : {}),
+      phoneNumber: health.phoneNumber,
       uptimeSeconds: health.uptimeSeconds,
       reconnections: health.reconnections,
+      ...(transport ? { transport } : {}),
     });
   });
 
@@ -56,11 +72,15 @@ export function createHealthMonitor(
       reconnections++;
     },
 
+    setTransportStats(provider: () => Record<string, unknown>) {
+      transportStats = provider;
+    },
+
     getStatus(): HealthStatus {
       return {
         status: connection === 'connected' ? 'healthy'
-          : connection === 'failed' || connection === 'logged-out' ? 'unhealthy'
-          : 'degraded',
+          : connection === 'connecting' || connection === 'awaiting-qr' ? 'degraded'
+          : 'unhealthy',
         connection,
         phoneNumber,
         uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),

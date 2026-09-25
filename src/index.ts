@@ -7,19 +7,26 @@ import { createWebhookDispatcher } from './transport/webhook-dispatcher';
 import { createRestApi } from './transport/rest-api';
 import { createSSETransport } from './transport/sse-transport';
 import { createIncomingMessageHub } from './core/incoming-message-hub';
-import { createSessionStore } from './storage/session-store';
-import { createAuthProvider } from './baileys/auth';
-import { createBaileysClient } from './baileys/client';
-import { createMessageSender } from './services/message-sender';
+import { createContactStore } from './storage/contact-store';
+import { createLabelStore } from './storage/label-store';
+import { createTemplateStore } from './storage/template-store';
 import { createCommandRegistry } from './commands/registry';
-import { createPresenceManager } from './services/presence-manager';
-import { createReadReceiptManager } from './services/read-receipt-manager';
 import { DiskMediaStore } from './storage/media-store';
 import { createMediaDownloader } from './services/media-downloader';
+import { createSessionManager } from './sessions/session-manager';
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
+
+  // Los plazos del pool se fijan **antes** de que nadie abra uno: la primera conexión se crea unas
+  // líneas más abajo, con los almacenes de contactos y etiquetas.
+  const { configurarPoolPorDefecto } = await import('./storage/postgres-db');
+  configurarPoolPorDefecto({
+    max: config.dbPoolMax,
+    statementTimeoutMs: config.dbStatementTimeoutMs,
+    idleTxTimeoutMs: config.dbIdleTxTimeoutMs,
+  });
 
   // ─── PostgreSQL startup gate ──────────────────────────────
   if (config.sessionStore === 'postgres') {
@@ -29,8 +36,8 @@ async function main(): Promise<void> {
     }
     const { waitForPostgres, runMigrations } = await import('./storage/postgres-db');
     try {
-      await waitForPostgres(config.databaseUrl, logger, 30_000);
-      await runMigrations(config.databaseUrl, logger);
+      await waitForPostgres(config.databaseUrl!, logger, 30_000);
+      await runMigrations(config.databaseUrl!, logger);
       logger.info('PostgreSQL ready, migrations applied');
     } catch (err) {
       logger.error('PostgreSQL startup failed', { error: String(err) });
@@ -38,50 +45,72 @@ async function main(): Promise<void> {
     }
   }
 
-  const eventBus = createEventBus();
-  const sessionStore = await createSessionStore(config, logger);
-  const authProvider = await createAuthProvider(sessionStore, logger);
-  const client = await createBaileysClient(config, eventBus, authProvider, sessionStore, logger);
-  const messageSender = createMessageSender(client, eventBus, logger);
-  const presenceManager = createPresenceManager(client, config, logger);
-  const readReceiptManager = createReadReceiptManager(client, eventBus, config, logger);
+  const globalEventBus = createEventBus();
+  const contactStore = await createContactStore(config.sessionStore, config.databaseUrl);
+  const labelStore = await createLabelStore(config.sessionStore, config.databaseUrl);
+  const templateStore = await createTemplateStore(config.sessionStore, config.databaseUrl);
   const mediaStore = new DiskMediaStore(config.mediaDir, logger);
-  const mediaDownloader = createMediaDownloader(mediaStore, eventBus, logger, config.mediaAutoDownload, config.mediaBaseUrl);
+
+  // ─── Session manager (multi-session pool) ─────────────────
+  const sessionManager = createSessionManager({ config, globalEventBus, contactStore, labelStore, logger });
+  await sessionManager.bootstrap();
+
+  // ─── Shared services (listen to global bus) ──────────────
+  const mediaDownloader = createMediaDownloader(mediaStore, globalEventBus, logger, config.mediaAutoDownload, config.mediaBaseUrl);
   const healthMonitor = createHealthMonitor(config.healthPort, logger, config.instanceName);
-  const messageRouter = createMessageRouter(eventBus, logger);
-  const webhookDispatcher = createWebhookDispatcher(eventBus, config, logger);
-  const incomingHub = createIncomingMessageHub(eventBus, logger, {
+  const messageRouter = createMessageRouter(globalEventBus, logger, { publishFromMe: config.publishFromMe });
+  const webhookDispatcher = createWebhookDispatcher(globalEventBus, config, logger);
+
+  // Vigilante del pool de Postgres. Termina desde fuera las conexiones que se quedan atascadas a
+  // media conversación del protocolo, que es el atasco que ningún plazo del servidor deshace y el
+  // que dejó a todas las líneas sin poder generar códigos QR.
+  let poolWatchdog: import('./storage/postgres-watchdog').PoolWatchdog | undefined;
+  if (config.sessionStore === 'postgres' && config.databaseUrl) {
+    const { createPoolWatchdog } = await import('./storage/postgres-watchdog');
+    poolWatchdog = createPoolWatchdog({
+      databaseUrl: config.databaseUrl,
+      logger,
+      intervalMs: config.dbWatchdogIntervalMs ?? 30_000,
+      maxAgeMs: config.dbWatchdogMaxAgeMs ?? 60_000,
+    });
+    poolWatchdog.start();
+  }
+
+  const { contadorConexionesCorrompidas } = await import('./storage/postgres-store');
+
+  healthMonitor.setTransportStats(() => ({
+    // Los dos contadores de la base de datos. Sin ellos esta avería vuelve a ser invisible hasta
+    // que alguien se ponga a leer registros: lo que se ve desde fuera es «no salen los QR».
+    postgres: {
+      conexionesCorrompidas: contadorConexionesCorrompidas(),
+      ...(poolWatchdog ? { vigilante: poolWatchdog.stats() } : {}),
+    },
+  }));
+  const incomingHub = createIncomingMessageHub(globalEventBus, logger, {
     maxSize: config.messageBufferSize,
     ttlMs: config.messageBufferTtlMs,
   });
   let sseTransport: ReturnType<typeof createSSETransport> | undefined;
   if (config.sseEnabled) {
-    sseTransport = createSSETransport(incomingHub, eventBus, logger, config.sseHeartbeatMs);
+    sseTransport = createSSETransport(incomingHub, globalEventBus, logger, config.sseHeartbeatMs);
   }
+
   const restApi = createRestApi(
     config.apiPort,
     config,
     logger,
-    (to, text) => messageSender.sendText(to, text),
-    (req) => messageSender.sendMedia(req),
-    () => client.getConnectionStatus(),
-    () => client.getQr(),
-    () => client.logout(),
-    () => client.getContacts(),
-    () => client.connect(),
-    (to, type, duration) => presenceManager.setPresence(to, type as any, duration),
+    sessionManager,
     incomingHub,
     sseTransport,
     mediaStore,
-    (to, participant, ids) => readReceiptManager.sendReadReceipt(to, ids, participant),
+    contactStore,
+    labelStore,
+    templateStore,
   );
-
-  // ─── Start media downloader ──────────────────────────────────
-  mediaDownloader.start();
 
   // ─── Bridge: connection updates → health monitor ─────────────
   let wasConnected = false;
-  eventBus.on('connection.update', (update) => {
+  globalEventBus.on('connection.update', (update) => {
     healthMonitor.updateConnection(update.status as any, update.phoneNumber);
     if (update.status === 'connected') {
       if (wasConnected) healthMonitor.incrementReconnections();
@@ -89,10 +118,14 @@ async function main(): Promise<void> {
     }
   });
 
-  // ─── Command system ─────────────────────────────────────────
+  // ─── Command system ───────────────────────────────────────────
+  // Reply is routed through the session that received the command, not a hardcoded legacy session.
   const commandRegistry = createCommandRegistry(
-    eventBus,
-    (to, text) => presenceManager.sendWithTyping(to, () => messageSender.sendText(to, text)),
+    globalEventBus,
+    (to, text, sessionId) => {
+      const session = sessionManager.getOrLegacy(sessionId);
+      return session.presenceManager.sendWithTyping(to, () => session.messageSender.sendText(to, text));
+    },
     logger,
   );
 
@@ -121,7 +154,8 @@ async function main(): Promise<void> {
 
   commandRegistry.start();
 
-  readReceiptManager.start();
+  // ─── Start media downloader ──────────────────────────────────
+  mediaDownloader.start();
 
   // ─── Start subsystems ───────────────────────────────────────
   healthMonitor.start();
@@ -130,18 +164,13 @@ async function main(): Promise<void> {
   webhookDispatcher.start();
   restApi.start();
 
-  if (config.connectOnStartup) {
-    await client.start();
-  }
-
   // ─── Handle shutdown ────────────────────────────────────────
   const shutdown = async (signal: string) => {
     logger.info('Shutdown signal received', { signal });
     commandRegistry.stop();
-    presenceManager.stop();
-    readReceiptManager.stop();
     mediaDownloader.stop();
-    await client.stop();
+    await poolWatchdog?.stop();
+    await sessionManager.stopAll();
     webhookDispatcher.stop();
     messageRouter.stop();
     incomingHub.stop();
@@ -157,6 +186,7 @@ async function main(): Promise<void> {
   logger.info('WACore started', {
     instance: config.instanceName,
     sessionStore: config.sessionStore,
+    sessions: sessionManager.list().length,
   });
 }
 

@@ -1,6 +1,6 @@
 # Recepción de mensajes
 
-WACore ofrece tres mecanismos para recibir mensajes entrantes de WhatsApp. Puedes usar uno o varios simultáneamente.
+WACore ofrece tres mecanismos para recibir mensajes entrantes de WhatsApp: SSE, webhook y polling. Puedes usar uno o varios simultáneamente.
 
 > **Importante — `from` vs `phone`**: Cada mensaje incluye dos campos para identificar al remitente:
 > - **`from`**: JID completo (ej: `5215512345678@s.whatsapp.net`). Úsalo **siempre** como valor de `to` al enviar una respuesta mediante `POST /api/send`.
@@ -19,7 +19,8 @@ const events = new EventSource(
   { headers: { Authorization: 'Bearer mi-api-key' } }
 );
 
-events.addEventListener('message.text', (event) => {
+// El nombre del evento SSE es el `type` del mensaje: text, image, ptt, reaction...
+events.addEventListener('text', (event) => {
   const msg = JSON.parse(event.data);
   console.log(`${msg.pushName}: ${msg.body}`);
 
@@ -42,6 +43,8 @@ events.addEventListener('message.text', (event) => {
 - Bajo overhead (una conexión TCP persistente).
 - Filtros del lado del servidor (`types`, `phone`, `includeGroups`).
 
+Además de los mensajes, todos los streams reciben los eventos `presence`, `message.status` y `call` (llamadas, ver más abajo).
+
 ## Webhook
 
 WACore hace un POST HTTP a una URL configurada por cada mensaje entrante. Ideal para integrar con servicios externos (n8n, Zapier, Make, tu propia API).
@@ -53,6 +56,35 @@ WEBHOOK_URL=https://mi-servicio.com/webhook/whatsapp
 WEBHOOK_SECRET=mi-clave-hmac
 WEBHOOK_EVENTS=message,connection,qr
 ```
+
+> **Ediciones.** Cuando un cliente edita un mensaje, WACore recibe el texto nuevo con el `id` del
+> mensaje **original**. Para que nadie lo tome por un mensaje nuevo, las ediciones no salen como
+> `message`: solo se envían si `WEBHOOK_EVENTS` incluye `message.edit`, con `event: "message.edit"`
+> y `data.isEdit: true`.
+
+Valores aceptados en `WEBHOOK_EVENTS` (separados por coma):
+
+| Valor | Evento(s) entregado(s) |
+|---|---|
+| `message` | `message`: mensajes entrantes (y ecos propios), salvo ediciones. |
+| `message.edit` | `message.edit`: ediciones, con `data.isEdit: true` y el mismo `id` del mensaje original. |
+| `connection` | `connection`: cambios de estado de la conexión. |
+| `qr` | `qr`: nuevo código QR. |
+| `media.downloaded` (o `media`) | `media.downloaded`: descarga de un archivo completada. |
+| `presence` | `presence`: presencia de contactos suscritos. |
+| `message.status` | `message.status`: acuses de envío, entrega y lectura. |
+| `call` | `call`: llamadas entrantes. |
+| `history` | `message.history` y `history.synced`: volcado de histórico al emparejar. |
+
+### Tipos de mensaje
+
+El campo `type` de un mensaje puede ser: `text`, `image`, `video`, `document`, `audio`, `ptt`
+(nota de voz), `sticker`, `location`, `contact`, `reaction`, `order`, `product`, `event`,
+`event_response` o `unknown`. Las notas de voz llegan como `ptt`, no como `audio`.
+
+En los tipos estructurados (pedidos, productos, eventos de calendario, ubicaciones, contactos) los
+datos relevantes van en `extras`. Las reacciones incluyen en `extras` el mensaje al que reaccionan:
+`targetId`, `targetFromMe`, `targetRemoteJid` y `senderJid`.
 
 Payload que recibe el webhook:
 
@@ -110,6 +142,38 @@ Si `WEBHOOK_EVENTS` incluye `media.downloaded`, se envía un webhook adicional c
   }
 }
 ```
+
+### Evento `call`
+
+Si `WEBHOOK_EVENTS` incluye `call`, cada llamada entrante genera varios eventos con el **mismo
+`id`**, uno por cada cambio de estado (`offer` al sonar y después `accept`, `reject`, `timeout` o
+`terminate`). Trátalos como actualizaciones de un mismo registro, no como llamadas distintas.
+
+```json
+{
+  "event": "call",
+  "instanceId": "bot-prod",
+  "timestamp": "2025-05-08T12:00:00.000Z",
+  "data": {
+    "id": "5A1B2C3D...",
+    "chatId": "5215512345678@s.whatsapp.net",
+    "from": "5215512345678@s.whatsapp.net",
+    "isGroup": false,
+    "isVideo": false,
+    "status": "offer",
+    "timestamp": 1746705600,
+    "offline": false
+  }
+}
+```
+
+### Eventos de histórico (`history`)
+
+Al emparejar una línea, WhatsApp envía un volcado con conversaciones antiguas. Si `WEBHOOK_EVENTS`
+incluye `history`, cada mensaje de ese volcado se entrega como `message.history` (mismo formato
+que `message`) y al terminar se envía `history.synced` con `count` (mensajes emitidos) y `skipped`
+(los que no cupieron en el tope). Estos mensajes **nunca** salen como `message`, para que un
+consumidor no conteste a conversaciones de hace meses.
 
 ### Auto-download
 

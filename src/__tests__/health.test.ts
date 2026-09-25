@@ -70,4 +70,44 @@ describe('HealthMonitor', () => {
     const res = await fetch('http://localhost:9882/');
     expect(res.status).toBe(404);
   });
+
+  // ─── Contadores del transporte ────────────────────────────────────────────
+  //
+  // Es cómo se ve desde fuera que RabbitMQ no responde: `outbox.pending` subiendo. Y cómo se
+  // ve que se ha perdido algo de verdad: `droppedTotal` distinto de cero.
+
+  it('publica los contadores del transporte cuando hay quien los dé', async () => {
+    monitor.setTransportStats(() => ({ rabbitmq: 'disconnected', pending: 12, dropped: 0 }));
+
+    const res = await fetch('http://localhost:9882/health');
+    const body = await res.json() as { transport?: Record<string, unknown> };
+
+    expect(body.transport).toEqual({ rabbitmq: 'disconnected', pending: 12, dropped: 0 });
+  });
+
+  it('un contador que revienta no tumba la sonda', async () => {
+    monitor.setTransportStats(() => { throw new Error('postgres caído'); });
+
+    const res = await fetch('http://localhost:9882/health');
+
+    // Devolver 500 aquí marcaría el contenedor como muerto por un detalle informativo.
+    expect(res.status).toBe(200);
+    const body = await res.json() as { status: string; transport?: Record<string, unknown> };
+    expect(body.status).toBe('healthy');
+    expect(body.transport).toEqual({ error: 'unavailable' });
+  });
+
+  it('sin proveedor no aparece el bloque', async () => {
+    const solo = createHealthMonitor(9883, logger, 'test-sin-transporte');
+    solo.start();
+    solo.updateConnection('connected');
+
+    try {
+      const res = await fetch('http://localhost:9883/health');
+      const body = await res.json() as { transport?: unknown };
+      expect(body.transport).toBeUndefined();
+    } finally {
+      solo.stop();
+    }
+  });
 });

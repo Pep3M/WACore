@@ -7,6 +7,59 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.0] — 2026-09-25
+
+Incorpora las mejoras y correcciones desarrolladas desde v0.3.2. El contrato de v0.3.2 se
+mantiene para los consumidores de una sola línea: rutas, auth por `API_KEY`, forma de las
+respuestas y del webhook. Los tests de `src/__tests__/contract/` lo fijan.
+
+### Added
+- **Envío**: citar un mensaje (`quotedMessageId` en `POST /api/send`), stickers, ubicación,
+  contactos, notas de voz (`/api/send-ptt`), reenvío (`POST /api/forward`), botones y listas
+  (opt-in con `WACORE_INTERACTIVE_MESSAGES`), eventos de calendario y productos del catálogo.
+- **Sobre mensajes enviados**: editar (`PATCH /api/messages/:chatId/:messageId`), revocar
+  (`DELETE`), reaccionar (`POST .../reaction`) y fijar (`POST .../pin`).
+- **Recepción**: notas de voz (`ptt`), stickers, ubicaciones, contactos, pedidos, productos,
+  eventos y respuestas interactivas. Las reacciones indican a qué mensaje se reaccionó
+  (`extras.targetId`). Las ediciones entrantes, con `WEBHOOK_EVENTS=...,message.edit`.
+- **Eventos opt-in del webhook**: `presence` (el cliente está escribiendo o grabando),
+  `message.status` (acuses enviado/entregado/leído), `call` (llamadas entrantes) y `history`
+  (volcado de conversaciones al emparejar: `message.history` y `history.synced`). El SSE emite
+  también `presence`, `message.status` y `call`.
+- `POST /api/presence/subscribe` para recibir la presencia de un contacto.
+- `POST /api/contacts/check`: qué números tienen WhatsApp. Agenda persistida en Postgres por
+  línea, con `POST /api/contacts/resync`.
+- Grupos, perfil propio y de contactos, etiquetas, acciones sobre chats (archivar, fijar,
+  silenciar, bloquear, borrar), plantillas locales (`/api/templates`) y catálogo.
+- `GET /api/status` añade `connection`, `phoneNumber`, `uptimeSeconds` y `reconnections`.
+- Publicar los mensajes propios escritos desde el móvil (`WACORE_PUBLISH_FROM_ME`, opt-in).
+- `LOG_FORMAT=pretty` para desarrollo.
+
+### Fixed
+- Las escrituras de credenciales se agrupan y ya no se pierden claves entre reinicios.
+- La versión de WhatsApp Web se resuelve al arrancar (`WA_WEB_VERSION` para fijarla).
+- Un corte de red largo ya no deja la línea muerta para siempre.
+- Una sesión que nadie escanea deja de pedir QR tras `QR_MAX_ROUNDS` rondas (3 por defecto) y
+  pasa a `disconnected`; se reanuda con `POST /api/connect`.
+- Que otro cliente reemplace la sesión (`connectionReplaced`) ya no provoca una guerra de
+  reconexiones.
+- Los acuses de lectura con `@lid` ya pasan del primer tick.
+- Postgres: plazos en el pool, vigilante de conexiones atascadas y espera de arranque con reloj
+  monotónico. Diagnóstico de migraciones que se saltarían.
+- Un registro ilegible del snapshot de app-state ya no deja la línea sin agenda.
+- `/data/media` se crea en la imagen: los adjuntos entrantes fallaban con `EACCES`.
+- `tsx` pasa a ser dependencia de producción: la imagen lo descargaba en cada arranque.
+
+### Changed
+- Las notas de voz entran como `type: "ptt"` (antes `audio`).
+- Tipos de mensaje que antes se descartaban llegan ahora por el evento `message`. Un
+  consumidor que solo espere texto debe filtrar por `data.type`.
+- `GET /api/contacts` lee de la agenda persistida y pagina (`limit` 100 por defecto).
+- `/health` devuelve `unhealthy` cuando la línea está desconectada (sigue respondiendo 200) y
+  añade `transport.postgres`.
+- Migraciones nuevas 0001–0006 (contactos, sesiones, etiquetas, plantillas). Se aplican solas
+  sobre una base de v0.3.2.
+
 ## [0.3.2] — 2026-05-10
 
 ### Added
