@@ -1,4 +1,5 @@
-import { downloadMediaMessage, extensionForMediaMessage } from 'baileys';
+import { downloadMediaMessage } from 'baileys/lib/Utils/messages';
+import { extensionForMediaMessage } from 'baileys/lib/Utils/messages-media';
 import type { WAMessage } from 'baileys';
 import type { Logger } from '../utils/logger';
 import type { EventBus } from '../core/event-bus';
@@ -29,6 +30,9 @@ export function createMediaDownloader(
     if (raw?.message?.imageMessage) return 'jpg';
     if (raw?.message?.videoMessage) return 'mp4';
     if (raw?.message?.audioMessage) return 'ogg';
+    // Los stickers de WhatsApp son siempre WebP. Se dice aquí en vez de dejarlo al camino de
+    // reserva, que ante cualquier fallo devuelve 'bin' y dejaría el fichero sin poder pintarse.
+    if (raw?.message?.stickerMessage) return 'webp';
     if (raw?.message?.documentMessage) {
       const fileName = raw.message.documentMessage.fileName ?? '';
       const ext = fileName.split('.').pop()?.toLowerCase();
@@ -47,7 +51,11 @@ export function createMediaDownloader(
       raw.message.imageMessage ||
       raw.message.videoMessage ||
       raw.message.audioMessage ||
-      raw.message.documentMessage
+      raw.message.documentMessage ||
+      // El sticker también es un adjunto que hay que descargar. Faltaba, y mientras los stickers
+      // no salían del proceso no se notaba; en cuanto se publican, quien los reciba pediría un
+      // `mediaId` que aquí nunca se guardó y obtendría un 404.
+      raw.message.stickerMessage
     );
   }
 

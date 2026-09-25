@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 import type { Logger } from '../utils/logger';
-import type { NormalizedMessage, ConnectionUpdateEvent } from '../types';
+import type { NormalizedMessage, ConnectionUpdateEvent, PresenceContactEvent, MessageStatusEvent, CallEvent } from '../types';
 import type { IncomingMessageHub } from '../core/incoming-message-hub';
 import type { EventBus } from '../core/event-bus';
 
@@ -23,6 +23,9 @@ export function createSSETransport(
 
   const activeStreams = new Map<Response, StreamEntry>();
   let unsubConnection: (() => void) | null = null;
+  let unsubPresence: (() => void) | null = null;
+  let unsubMessageStatus: (() => void) | null = null;
+  let unsubCall: (() => void) | null = null;
 
   function broadcastToAll(event: string, data: string): void {
     for (const { res } of activeStreams.values()) {
@@ -47,6 +50,24 @@ export function createSSETransport(
           status: update.status,
           phone: update.phoneNumber || null,
         }));
+      });
+    }
+
+    if (!unsubPresence) {
+      unsubPresence = eventBus.on('presence.contact', (evt: PresenceContactEvent) => {
+        broadcastToAll('presence', JSON.stringify(evt));
+      });
+    }
+
+    if (!unsubMessageStatus) {
+      unsubMessageStatus = eventBus.on('message.status', (evt: MessageStatusEvent) => {
+        broadcastToAll('message.status', JSON.stringify(evt));
+      });
+    }
+
+    if (!unsubCall) {
+      unsubCall = eventBus.on('call', (evt: CallEvent) => {
+        broadcastToAll('call', JSON.stringify(evt));
       });
     }
 
@@ -113,6 +134,18 @@ export function createSSETransport(
     if (unsubConnection) {
       unsubConnection();
       unsubConnection = null;
+    }
+    if (unsubPresence) {
+      unsubPresence();
+      unsubPresence = null;
+    }
+    if (unsubCall) {
+      unsubCall();
+      unsubCall = null;
+    }
+    if (unsubMessageStatus) {
+      unsubMessageStatus();
+      unsubMessageStatus = null;
     }
     logger.info('SSE transport stopped');
   }

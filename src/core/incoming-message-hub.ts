@@ -1,23 +1,15 @@
 import type { EventBus } from './event-bus';
 import type { Logger } from '../utils/logger';
-import type { NormalizedMessage, MessageHandler, MessageBufferConfig, PollMessagesResponse, WACoreEventName } from '../types';
+import type { NormalizedMessage, MessageHandler, MessageBufferConfig, PollMessagesResponse } from '../types';
+import { MESSAGE_EVENT_NAMES } from '../types';
 
 export interface IncomingMessageHub {
   registerHandler(handler: MessageHandler): () => void;
   unregisterHandler(handler: MessageHandler): void;
-  getRecentMessages(since?: string, limit?: number): PollMessagesResponse;
+  getRecentMessages(since?: string, limit?: number, sessionId?: string): PollMessagesResponse;
   start(): void;
   stop(): void;
 }
-
-const MESSAGE_EVENT_NAMES: WACoreEventName[] = [
-  'message.text',
-  'message.image',
-  'message.video',
-  'message.document',
-  'message.audio',
-  'message.reaction',
-];
 
 export function createIncomingMessageHub(eventBus: EventBus, logger: Logger, config: MessageBufferConfig): IncomingMessageHub {
   const buffer: NormalizedMessage[] = [];
@@ -37,7 +29,7 @@ export function createIncomingMessageHub(eventBus: EventBus, logger: Logger, con
     return Date.now() - ttlMs;
   }
 
-  function getRecentMessages(since?: string, limit: number = 50): PollMessagesResponse {
+  function getRecentMessages(since?: string, limit: number = 50, sessionId?: string): PollMessagesResponse {
     const sinceTs = since ? new Date(since).getTime() : 0;
     const validSince = !isNaN(sinceTs) ? sinceTs : 0;
     const expiration = getExpirationTimestamp();
@@ -46,6 +38,9 @@ export function createIncomingMessageHub(eventBus: EventBus, logger: Logger, con
       const msgTs = msg.timestamp * 1000;
       if (msgTs < expiration) return false;
       if (validSince > 0 && msgTs <= validSince) return false;
+      // Only filter by session when the message carries a sessionId (multi-session mode).
+      // Legacy messages (no sessionId) are always included for backward compatibility.
+      if (sessionId !== undefined && msg.sessionId !== undefined && msg.sessionId !== sessionId) return false;
       return true;
     });
 

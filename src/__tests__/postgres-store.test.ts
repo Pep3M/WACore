@@ -26,6 +26,12 @@ const mockState: {
   endCalled: boolean;
   endError: boolean;
   migrateCalled: boolean;
+  /** Todo lo interpolado en cada consulta, para poder afirmar qué recibe el driver. */
+  valores: unknown[][];
+  /** Con qué error falla, cuando `shouldFail`. Por defecto uno corriente de conexión. */
+  error: unknown;
+  /** Las opciones con las que se abrió el último pool. */
+  opciones: Record<string, unknown> | undefined;
 } = {
   rows: [],
   shouldFail: false,
@@ -34,13 +40,17 @@ const mockState: {
   endCalled: false,
   endError: false,
   migrateCalled: false,
+  valores: [],
+  error: null,
+  opciones: undefined,
 };
 
 function createMockSql() {
-  const sql = ((strings: TemplateStringsArray, ..._values: unknown[]) => {
+  const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     mockState.callCount++;
+    mockState.valores.push(values);
     if (mockState.shouldFail && mockState.callCount <= mockState.failCount) {
-      return Promise.reject(new Error('connection refused'));
+      return Promise.reject(mockState.error ?? new Error('connection refused'));
     }
     return Promise.resolve(mockState.rows);
   }) as unknown as {
@@ -60,7 +70,10 @@ function createMockSql() {
 
 // ─── Module mocks ──────────────────────────────────────────
 mock.module('postgres', () => ({
-  default: () => createMockSql(),
+  default: (_url: string, opciones?: Record<string, unknown>) => {
+    mockState.opciones = opciones;
+    return createMockSql();
+  },
 }));
 
 mock.module('drizzle-orm/postgres-js', () => ({
@@ -101,6 +114,9 @@ beforeEach(() => {
   mockState.endCalled = false;
   mockState.endError = false;
   mockState.migrateCalled = false;
+  mockState.valores = [];
+  mockState.error = null;
+  mockState.opciones = undefined;
 });
 
 // ─── Tests ─────────────────────────────────────────────────
@@ -265,6 +281,27 @@ describe('waitForPostgres', () => {
       waitForPostgres('postgres://localhost:5432/db', logger, 100),
     ).rejects.toThrow('PostgreSQL not available');
   });
+
+  // El backoff arrancaba en 1 s fijo, así que un plazo de 100 ms tardaba 1 s en
+  // rendirse: diez veces lo pedido.
+  //
+  // Se mide con `performance.now()`, no con `Date.now()`, por lo mismo que lo hace
+  // la función: el reloj de pared puede saltar hacia atrás al resincronizar y este
+  // test acabaría midiendo el salto en vez del backoff.
+  it('se rinde dentro del plazo recibido, sin dormir de más', async () => {
+    const { waitForPostgres } = PostgresDbModule;
+    mockState.shouldFail = true;
+    mockState.failCount = Infinity;
+
+    const inicio = performance.now();
+    await expect(
+      waitForPostgres('postgres://localhost:5432/db', logger, 100),
+    ).rejects.toThrow('PostgreSQL not available');
+    const transcurrido = performance.now() - inicio;
+
+    // Con el backoff sin acotar esto era >= 1000 ms.
+    expect(transcurrido).toBeLessThan(700);
+  });
 });
 
 // ─── runMigrations tests ────────────────────────────────────
@@ -314,5 +351,168 @@ describe('createConnection', () => {
     expect(conn.db).toBeDefined();
     // Clean up
     conn.sql.end();
+  });
+
+  /**
+   * El pool nacía con `max: 3` y sin un solo plazo. Esa combinación es la que convertía una
+   * consulta atascada en «ninguna línea de WhatsApp genera ya códigos QR»: tres tropiezos y no
+   * quedaba conexión libre para nadie, y `sessionManager.create()` espera a la base **antes** de
+   * arrancar Baileys.
+   */
+  it('abre el pool con plazos puestos en el servidor', () => {
+    const { createConnection, configurarPoolPorDefecto } = PostgresDbModule;
+    configurarPoolPorDefecto({});
+
+    const conn = createConnection('postgres://localhost:5432/db');
+
+    expect(mockState.opciones?.max).toBe(10);
+    expect(mockState.opciones?.connection as Record<string, unknown>).toMatchObject({
+      statement_timeout: 30_000,
+      idle_in_transaction_session_timeout: 60_000,
+    });
+    conn.sql.end();
+  });
+
+  it('respeta el tamaño y los plazos configurados', () => {
+    const { createConnection, configurarPoolPorDefecto, opcionesDePool } = PostgresDbModule;
+    configurarPoolPorDefecto({ max: 25, statementTimeoutMs: 1_000, idleTxTimeoutMs: 2_000 });
+
+    expect(opcionesDePool()).toEqual({ max: 25, statementTimeoutMs: 1_000, idleTxTimeoutMs: 2_000 });
+
+    const conn = createConnection('postgres://localhost:5432/db');
+    expect(mockState.opciones?.max).toBe(25);
+    expect(mockState.opciones?.connection as Record<string, unknown>).toMatchObject({
+      statement_timeout: 1_000,
+      idle_in_transaction_session_timeout: 2_000,
+    });
+
+    conn.sql.end();
+    configurarPoolPorDefecto({});
+  });
+
+  // `0` es la forma que tiene Postgres de decir «sin plazo», así que tiene que llegar tal cual:
+  // es la única manera de desactivarlos desde la configuración sin tocar código.
+  it('deja pasar el 0, que para Postgres significa sin plazo', () => {
+    const { createConnection, configurarPoolPorDefecto } = PostgresDbModule;
+    configurarPoolPorDefecto({ statementTimeoutMs: 0, idleTxTimeoutMs: 0 });
+
+    const conn = createConnection('postgres://localhost:5432/db');
+    expect(mockState.opciones?.connection as Record<string, unknown>).toMatchObject({
+      statement_timeout: 0,
+      idle_in_transaction_session_timeout: 0,
+    });
+
+    conn.sql.end();
+    configurarPoolPorDefecto({});
+  });
+});
+
+// ─── El Date que rompía la conexión ─────────────────────────
+describe('PostgresSessionRegistry.updateStatus', () => {
+  /**
+   * El parámetro que reventaba. `postgres-js` serializa los valores mientras escribe el mensaje en
+   * el socket; cuando ese paso falla, falla **a medias**, y la conexión queda inservible pero
+   * vuelve al pool. Con un texto ISO no hay nada que el driver pueda romper: la conversión la hace
+   * Postgres, que es quien sabe.
+   */
+  it('no le entrega nunca un Date al driver', async () => {
+    const { PostgresSessionRegistry } = await import('../storage/postgres-store');
+    const registry = new PostgresSessionRegistry(createMockSql() as never);
+
+    await registry.updateStatus('1:42', {
+      status: 'connected',
+      phoneNumber: '+34612345678',
+      lastSeenAt: new Date('2026-09-01T10:00:00.000Z'),
+    });
+
+    const valores = mockState.valores.at(-1)!;
+    expect(valores.some(v => v instanceof Date)).toBe(false);
+    expect(valores).toContain('2026-09-01T10:00:00.000Z');
+  });
+
+  it('tampoco cuando la fecha la pone él porque no se la dieron', async () => {
+    const { PostgresSessionRegistry } = await import('../storage/postgres-store');
+    const registry = new PostgresSessionRegistry(createMockSql() as never);
+
+    await registry.updateStatus('1:42', { status: 'logged-out' });
+
+    const valores = mockState.valores.at(-1)!;
+    expect(valores.some(v => v instanceof Date)).toBe(false);
+    expect(valores.some(v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T.*Z$/.test(v))).toBe(true);
+  });
+});
+
+// ─── Un fallo de consulta no es una conexión rota ───────────
+describe('conexiones corrompidas', () => {
+  /** Un SQLSTATE es Postgres hablando: la consulta cayó, la conexión sigue sirviendo. */
+  it('un error de Postgres no cuenta como conexión corrompida', async () => {
+    const mod = await import('../storage/postgres-store');
+    mod.reiniciarContadorConexionesCorrompidas();
+
+    const err = Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' });
+    mockState.shouldFail = true;
+    mockState.failCount = 1;
+    mockState.error = err;
+
+    const store = new PostgresStoreClass(mockConfig, logger);
+    await store.delete();
+
+    expect(mod.esConexionCorrompida(err)).toBe(false);
+    expect(mod.contadorConexionesCorrompidas()).toBe(0);
+  });
+
+  /**
+   * El error real del incidente, literal. Antes se registraba como un aviso más entre muchos y la
+   * conexión rota volvía al pool sin que nadie se enterara.
+   */
+  it('un TypeError del serializador sí cuenta', async () => {
+    const mod = await import('../storage/postgres-store');
+    mod.reiniciarContadorConexionesCorrompidas();
+
+    const err = Object.assign(
+      new TypeError('The "string" argument must be of type string or an instance of Buffer or ArrayBuffer. Received an instance of Date'),
+      { code: 'ERR_INVALID_ARG_TYPE' },
+    );
+    mockState.shouldFail = true;
+    mockState.failCount = 1;
+    mockState.error = err;
+
+    const store = new PostgresStoreClass(mockConfig, logger);
+
+    // Y sigue sin propagar: el único que llama aquí es `client.logout()`, y desde ahí un error
+    // convertiría en un 500 la petición de desconectar una línea que sí se ha desconectado.
+    await store.delete();
+
+    expect(mod.esConexionCorrompida(err)).toBe(true);
+    expect(mod.contadorConexionesCorrompidas()).toBe(1);
+  });
+
+  it('lo cuenta venga de donde venga, no solo de delete()', async () => {
+    const mod = await import('../storage/postgres-store');
+    mod.reiniciarContadorConexionesCorrompidas();
+
+    mockState.shouldFail = true;
+    mockState.failCount = 3;
+    mockState.error = new TypeError('Received an instance of Date');
+
+    const store = new PostgresStoreClass(mockConfig, logger);
+    await store.exists();
+    await store.load();
+    await store.save({}, {});
+
+    expect(mod.contadorConexionesCorrompidas()).toBe(3);
+  });
+
+  it('un fallo de conexión corriente sigue tratándose como antes', async () => {
+    const mod = await import('../storage/postgres-store');
+    mod.reiniciarContadorConexionesCorrompidas();
+
+    mockState.shouldFail = true;
+    mockState.failCount = 1;
+    mockState.error = new Error('connection refused');
+
+    const store = new PostgresStoreClass(mockConfig, logger);
+    expect(await store.exists()).toBe(false);
+    expect(mod.contadorConexionesCorrompidas()).toBe(0);
   });
 });
