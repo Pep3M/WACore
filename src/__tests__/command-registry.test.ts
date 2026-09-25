@@ -198,7 +198,7 @@ describe('CommandRegistry - Execution', () => {
 
   it('passes reply function that sends to the message sender', async () => {
     const bus = createEventBus();
-    const sendReply = mock(async (_to: string, _text: string) => 'reply-id');
+    const sendReply = mock(async (_to: string, _text: string, _sessionId?: string) => 'reply-id');
     const registry = createCommandRegistry(bus, sendReply, logger);
     const handler = mock(async (_msg: NormalizedMessage, _args: string[], replyFn: any) => {
       await replyFn('Hello back');
@@ -212,7 +212,7 @@ describe('CommandRegistry - Execution', () => {
     expect(handler).toHaveBeenCalledTimes(1);
     const replyFn = handler.mock.calls[0]?.[2];
     await replyFn('Hello back');
-    expect(sendReply).toHaveBeenCalledWith('5215551234567@s.whatsapp.net', 'Hello back');
+    expect(sendReply).toHaveBeenCalledWith('5215551234567@s.whatsapp.net', 'Hello back', undefined);
     registry.stop();
   });
 
@@ -357,6 +357,35 @@ describe('CommandRegistry - Custom Prefix', () => {
     bus.emit('message.text', makeTextMessage({ body: '!ping' }));
 
     expect(handler).not.toHaveBeenCalled();
+    registry.stop();
+  });
+  it('no ejecuta comandos de mensajes propios', async () => {
+    const bus = createEventBus();
+    const registry = createCommandRegistry(bus, reply, logger);
+    const handler = mock();
+
+    registry.register({ name: 'ping', description: 'test', handler });
+    registry.start();
+
+    // Desde que se publican los mensajes propios, escribir `!ping` en el móvil de la
+    // empresa lanzaría el bot contra uno mismo y la línea acabaría hablando sola.
+    bus.emit('message.text', makeTextMessage({ body: '!ping', fromMe: true }));
+
+    expect(handler).not.toHaveBeenCalled();
+    registry.stop();
+  });
+
+  it('sigue ejecutando los comandos de quien escribe desde fuera', async () => {
+    const bus = createEventBus();
+    const registry = createCommandRegistry(bus, reply, logger);
+    const handler = mock();
+
+    registry.register({ name: 'ping', description: 'test', handler });
+    registry.start();
+
+    bus.emit('message.text', makeTextMessage({ body: '!ping', fromMe: false }));
+
+    expect(handler).toHaveBeenCalledTimes(1);
     registry.stop();
   });
 });

@@ -11,8 +11,8 @@ export class RedisStore implements SessionStore {
   private logger: Logger;
   private instanceName: string;
 
-  constructor(config: EnvConfig, logger: Logger) {
-    this.instanceName = config.instanceName;
+  constructor(config: EnvConfig, logger: Logger, options?: { instanceName?: string }) {
+    this.instanceName = options?.instanceName ?? config.instanceName;
     this.logger = logger;
     this.redis = new Redis(config.redisUrl ?? 'redis://localhost:6379', {
       maxRetriesPerRequest: 3,

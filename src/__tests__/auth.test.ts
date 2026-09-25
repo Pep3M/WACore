@@ -44,16 +44,21 @@ describe('AuthProvider', () => {
     expect(typeof provider.state.keys.set).toBe('function');
   });
 
-  it('debounces saveCreds calls within same microtask', async () => {
+  it('coalesces rapid saveCreds calls to at most one follow-up write', async () => {
+    // Contrato: mientras un save está en vuelo, los saves siguientes se
+    // fusionan en UN único save posterior — nunca se descartan silenciosamente.
+    // Máximo esperado: 2 escrituras (la en vuelo + una de seguimiento).
     const store = createMockStore(false);
     const provider = await createAuthProvider(store, logger);
 
     provider.saveCreds();
     provider.saveCreds();
     provider.saveCreds();
-    await Bun.sleep(0);
+    await provider.saveCreds();
 
-    expect(store.save).toHaveBeenCalledTimes(1);
+    const calls = (store.save as any).mock.calls.length;
+    expect(calls).toBeGreaterThanOrEqual(1);
+    expect(calls).toBeLessThanOrEqual(2);
   });
 
   it('calls sessionStore.save with current state', async () => {

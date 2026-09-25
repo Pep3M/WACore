@@ -8,6 +8,48 @@
       "when": 1778271577956,
       "tag": "0000_nappy_matthew_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778357977956,
+      "tag": "0001_wacore_contacts",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778444377956,
+      "tag": "0002_multi_session",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778530777956,
+      "tag": "0003_wacore_labels",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778617177956,
+      "tag": "0004_wacore_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778703577956,
+      "tag": "0005_wacore_label_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778789977956,
+      "tag": "0006_wacore_contactos_por_linea",
+      "breakpoints": true
     }
   ]
 }

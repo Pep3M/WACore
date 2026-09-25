@@ -1,6 +1,7 @@
 import type { EventBus } from './event-bus';
 import type { Logger } from '../utils/logger';
 import type { NormalizedMessage, MessageType, WACoreEventName } from '../types';
+import { normalizeMessage } from './normalize-message';
 
 export interface MessageRouter {
   start(): void;
@@ -13,31 +14,39 @@ const MESSAGE_EVENTS: Record<MessageType, WACoreEventName> = {
   video: 'message.video',
   document: 'message.document',
   audio: 'message.audio',
+  ptt: 'message.ptt',
+  sticker: 'message.sticker',
+  location: 'message.location',
+  contact: 'message.contact',
   reaction: 'message.reaction',
+  order: 'message.order',
+  product: 'message.product',
+  event: 'message.event',
+  event_response: 'message.event_response',
   unknown: 'message.text',
 };
 
-export function createMessageRouter(eventBus: EventBus, logger: Logger): MessageRouter {
+export interface MessageRouterOptions {
+  /**
+   * Publicar también los mensajes que salen de la línea.
+   *
+   * Lo que un comercial escribe desde su propio móvil no existe para el consumidor mientras esto
+   * esté apagado. Se enciende cuando el consumidor sabe descartar el eco de sus propios
+   * envíos, que llegan marcados con `origin: 'api'`.
+   */
+  publishFromMe?: boolean;
+}
+
+export function createMessageRouter(
+  eventBus: EventBus,
+  logger: Logger,
+  opts: MessageRouterOptions = {},
+): MessageRouter {
+  const publishFromMe = opts.publishFromMe === true;
+
   function normalize(raw: any): NormalizedMessage | null {
     try {
-      if (raw.key?.fromMe) return null;
-
-      const type = detectMessageType(raw);
-      if (!type) return null;
-
-      return {
-        id: raw.key?.id ?? '',
-        from: raw.key?.remoteJid ?? '',
-        phone: extractPhone(raw.key?.remoteJid ?? ''),
-        pushName: raw.pushName ?? '',
-        isGroup: (raw.key?.remoteJid ?? '').endsWith('@g.us'),
-        groupId: (raw.key?.remoteJid ?? '').endsWith('@g.us') ? raw.key?.remoteJid ?? null : null,
-        timestamp: extractTimestamp(raw.messageTimestamp),
-        type,
-        body: extractBody(raw, type),
-        quotedMessage: extractQuoted(raw),
-        media: extractMedia(raw, type, raw.key?.id),
-      };
+      return normalizeMessage(raw, { publishFromMe });
     } catch (err) {
       logger.error('Failed to normalize message', { error: String(err) });
       return null;
@@ -53,9 +62,36 @@ export function createMessageRouter(eventBus: EventBus, logger: Logger): Message
           return;
         }
         const targetEvent = MESSAGE_EVENTS[normalized.type] ?? 'message.text';
-        logger.info('Message normalized', { type: normalized.type, from: normalized.phone, body: normalized.body?.slice(0, 50) });
+        logger.info('Message normalized', {
+          type: normalized.type,
+          from: normalized.phone,
+          fromMe: normalized.fromMe,
+          origin: normalized.origin,
+          body: normalized.body?.slice(0, 50),
+        });
         eventBus.emit(targetEvent, normalized);
       });
+      // El histórico entra por su propia puerta: normalizarlo con el mismo código evita que el
+      // volcado y lo que llega en vivo acaben con formas distintas en la misma conversación.
+      //
+      // Se le deja pasar lo propio **siempre**, sin mirar `publishFromMe`: esa bandera existe
+      // para que el eco de un envío no duplique lo que el consumidor ya tiene guardado, y en un volcado
+      // no hay nada guardado. Con ella apagada, el histórico llegaría con media conversación.
+      eventBus.on('history.message', (raw: any) => {
+        let normalized: NormalizedMessage | null = null;
+
+        try {
+          normalized = normalizeMessage(raw, { publishFromMe: true });
+        } catch (err) {
+          logger.error('Failed to normalize history message', { error: String(err) });
+          return;
+        }
+
+        if (!normalized) return;
+
+        eventBus.emit('message.history', normalized);
+      });
+
       logger.info('Message router started');
     },
 
@@ -63,63 +99,4 @@ export function createMessageRouter(eventBus: EventBus, logger: Logger): Message
       logger.info('Message router stopped');
     },
   };
-}
-
-function detectMessageType(raw: any): MessageType | null {
-  if (raw.message?.conversation) return 'text';
-  if (raw.message?.extendedTextMessage) return 'text';
-  if (raw.message?.imageMessage) return 'image';
-  if (raw.message?.videoMessage) return 'video';
-  if (raw.message?.documentMessage) return 'document';
-  if (raw.message?.audioMessage) return 'audio';
-  if (raw.message?.reactionMessage) return 'reaction';
-  return null;
-}
-
-function extractBody(raw: any, type: MessageType): string | null {
-  const msg = raw.message ?? {};
-  switch (type) {
-    case 'text': return msg.conversation ?? msg.extendedTextMessage?.text ?? null;
-    case 'image': return msg.imageMessage?.caption ?? null;
-    case 'video': return msg.videoMessage?.caption ?? null;
-    case 'document': return msg.documentMessage?.caption ?? null;
-    case 'reaction': return msg.reactionMessage?.text ?? null;
-    default: return null;
-  }
-}
-
-function extractQuoted(raw: any): NormalizedMessage['quotedMessage'] {
-  const context = raw.message?.extendedTextMessage?.contextInfo;
-  if (!context?.quotedMessage) return null;
-  return {
-    id: context.stanzaId ?? '',
-    from: context.participant ?? '',
-    body: JSON.stringify(context.quotedMessage),
-    type: 'text',
-  };
-}
-
-function extractMedia(raw: any, type: MessageType, messageId?: string): NormalizedMessage['media'] {
-  const msg = raw.message ?? {};
-  const base = { mediaId: messageId, downloaded: false };
-  switch (type) {
-    case 'image': return { ...base, mimetype: msg.imageMessage?.mimetype ?? 'image/jpeg', caption: msg.imageMessage?.caption, filename: msg.imageMessage?.fileName };
-    case 'video': return { ...base, mimetype: msg.videoMessage?.mimetype ?? 'video/mp4', caption: msg.videoMessage?.caption, filename: msg.videoMessage?.fileName };
-    case 'document': return { ...base, mimetype: msg.documentMessage?.mimetype ?? 'application/octet-stream', filename: msg.documentMessage?.fileName, caption: msg.documentMessage?.caption };
-    case 'audio': return { ...base, mimetype: msg.audioMessage?.mimetype ?? 'audio/ogg', filename: msg.audioMessage?.fileName };
-    default: return null;
-  }
-}
-
-function extractPhone(jid: string): string {
-  return jid.split('@')[0] ?? jid;
-}
-
-function extractTimestamp(ts: unknown): number {
-  if (typeof ts === 'number') return ts;
-  if (ts && typeof ts === 'object' && 'low' in ts) {
-    const long = ts as { low: number; high: number };
-    return long.low + long.high * 0x100000000;
-  }
-  return Math.floor(Date.now() / 1000);
 }

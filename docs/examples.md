@@ -29,6 +29,8 @@ async function main() {
     for (const line of lines) {
       if (line.startsWith('data: ') && !line.includes('ping')) {
         const msg = JSON.parse(line.slice(6));
+        // El stream también emite presence, message.status y call: quedarse solo con texto
+        if (msg.type !== 'text') continue;
 
         // Responder con el mismo mensaje (eco)
         await fetch(`${API}/api/send`, {
@@ -86,6 +88,7 @@ async function main() {
     for (const line of lines) {
       if (line.startsWith('data: ') && !line.includes('ping')) {
         const msg = JSON.parse(line.slice(6));
+        if (!msg.phone) continue; // ignora presence, message.status y call
 
         if (!seen.has(msg.phone) && !msg.isGroup) {
           seen.add(msg.phone);

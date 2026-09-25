@@ -1,7 +1,7 @@
 # WACore
 
 > Backend WhatsApp multicanal basado en Baileys (WebSocket, TypeScript).
-> Conecta tu WhatsApp a servicios externos via API REST, SSE streaming o webhooks.
+> Conecta una línea de WhatsApp por proceso a servicios externos via API REST, SSE streaming o webhooks.
 
 [![Docker Build](https://github.com/Pep3M/WACore/actions/workflows/docker-build.yml/badge.svg)](https://github.com/Pep3M/WACore/actions/workflows/docker-build.yml)
 ![Runtime](https://img.shields.io/badge/runtime-Bun-ff69b4)
@@ -59,10 +59,10 @@ curl -H "Authorization: Bearer mi-clave-segura" http://localhost:9878/api/status
 
 | Recurso | Descripción |
 |---|---|
-| [`docs/api.md`](docs/api.md) | Documentación completa: API, variables de entorno, Docker, ejemplos |
+| [`docs/index.md`](docs/index.md) | Índice de la documentación: API, variables de entorno, Docker, ejemplos |
 | [docker-compose.yml](docker-compose.yml) | Infraestructura completa con Redis y PostgreSQL |
 | [.env.example](.env.example) | Todas las variables de entorno disponibles |
-| [AGENTS.md](AGENTS.md) | Convenciones del proyecto |
+| [CLAUDE.md](CLAUDE.md) | Convenciones del proyecto |
 
 ---
 
@@ -109,7 +109,7 @@ docker compose up -d
 | `SSE_ENABLED` | `true` | Streaming de mensajes en tiempo real |
 | `WEBHOOK_URL` | — | URL para webhook de mensajes entrantes |
 
-Ver todas en [docs/api.md](docs/api.md#variables-de-entorno).
+Ver todas en [docs/env-vars.md](docs/env-vars.md).
 
 ---
 

@@ -12,7 +12,10 @@ COPY tsconfig.json ./
 COPY src/ ./src/
 COPY migrations/ ./migrations/
 
-RUN mkdir -p /data/sessions /data/logs && chown -R node:node /data /app
+# /data/media también: es el punto de montaje del volumen de adjuntos y si no existe en la
+# imagen, Docker lo crea de root y el proceso (uid 1000) no puede escribir. Los adjuntos
+# entrantes se perdían con «EACCES: permission denied».
+RUN mkdir -p /data/sessions /data/logs /data/media && chown -R node:node /data /app
 
 USER node
 

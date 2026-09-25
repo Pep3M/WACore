@@ -70,9 +70,23 @@ describe('loadConfig', () => {
     expect(loadConfig().connectOnStartup).toBe(false);
   });
 
-  it('loads pollingEnabled default as false', () => {
+  it('loads pollingEnabled default as true', () => {
     delete Bun.env.POLLING_ENABLED;
+    expect(loadConfig().pollingEnabled).toBe(true);
+  });
+
+  it('POLLING_ENABLED=false disables polling', () => {
+    Bun.env.POLLING_ENABLED = 'false';
     expect(loadConfig().pollingEnabled).toBe(false);
+    delete Bun.env.POLLING_ENABLED;
+  });
+
+  it('loads legacySessionEnabled default as true, LEGACY_SESSION_ENABLED=false disables it', () => {
+    delete Bun.env.LEGACY_SESSION_ENABLED;
+    expect(loadConfig().legacySessionEnabled).toBe(true);
+    Bun.env.LEGACY_SESSION_ENABLED = 'false';
+    expect(loadConfig().legacySessionEnabled).toBe(false);
+    delete Bun.env.LEGACY_SESSION_ENABLED;
   });
 
   it('loads sseEnabled default as true', () => {
@@ -125,8 +139,49 @@ describe('loadConfig', () => {
     expect(config.mediaBaseUrl).toBe('http://cdn.example.com');
   });
 
-  it('throws when WA_INSTANCE_NAME is missing', () => {
+  it('defaults instanceName to "default" when WA_INSTANCE_NAME is missing', () => {
     delete Bun.env.WA_INSTANCE_NAME;
-    expect(() => loadConfig()).toThrow('WA_INSTANCE_NAME es requerida');
+    expect(loadConfig().instanceName).toBe('default');
+  });
+
+  /**
+   * Los plazos de la base de datos. El pool nacía con `max: 3` y sin ningún plazo, y esa
+   * combinación es la que convertía una consulta atascada en «ninguna línea genera ya códigos QR».
+   */
+  it('trae plazos de base de datos por omisión, y el pool ya no es de 3', () => {
+    delete Bun.env.WACORE_DB_POOL_MAX;
+    delete Bun.env.WACORE_DB_STATEMENT_TIMEOUT_MS;
+    delete Bun.env.WACORE_DB_IDLE_TX_TIMEOUT_MS;
+    delete Bun.env.WACORE_DB_WATCHDOG_INTERVAL_MS;
+    delete Bun.env.WACORE_DB_WATCHDOG_MAX_AGE_MS;
+    delete Bun.env.WACORE_REGISTRY_TIMEOUT_MS;
+
+    const config = loadConfig();
+
+    expect(config.dbPoolMax).toBe(10);
+    expect(config.dbStatementTimeoutMs).toBe(30000);
+    expect(config.dbIdleTxTimeoutMs).toBe(60000);
+    expect(config.dbWatchdogIntervalMs).toBe(30000);
+    expect(config.dbWatchdogMaxAgeMs).toBe(60000);
+    expect(config.registryTimeoutMs).toBe(5000);
+  });
+
+  it('deja afinar los plazos de base de datos por entorno', () => {
+    Bun.env.WACORE_DB_POOL_MAX = '20';
+    Bun.env.WACORE_DB_STATEMENT_TIMEOUT_MS = '15000';
+    Bun.env.WACORE_DB_IDLE_TX_TIMEOUT_MS = '45000';
+    Bun.env.WACORE_DB_WATCHDOG_INTERVAL_MS = '0';
+    Bun.env.WACORE_DB_WATCHDOG_MAX_AGE_MS = '120000';
+    Bun.env.WACORE_REGISTRY_TIMEOUT_MS = '8000';
+
+    const config = loadConfig();
+
+    expect(config.dbPoolMax).toBe(20);
+    expect(config.dbStatementTimeoutMs).toBe(15000);
+    expect(config.dbIdleTxTimeoutMs).toBe(45000);
+    // `0` apaga el vigilante, así que tiene que llegar tal cual y no caer al valor por omisión.
+    expect(config.dbWatchdogIntervalMs).toBe(0);
+    expect(config.dbWatchdogMaxAgeMs).toBe(120000);
+    expect(config.registryTimeoutMs).toBe(8000);
   });
 });
