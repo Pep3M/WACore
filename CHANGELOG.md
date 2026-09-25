@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.0] — 2026-09-25
+
+### Added
+- **Recepción**: los mensajes reenviados llegan con `isForwarded: true` y `forwardingScore`
+  (cuántas veces se reenvió; desde 5 WhatsApp lo muestra como «Reenviado muchas veces»). En los
+  demás mensajes los dos campos no vienen, así que el contrato de v1.4.0 no cambia.
+
+---
+
 ## [1.4.0] — 2026-09-25
 
 Incorpora las mejoras y correcciones desarrolladas desde v0.3.2. El contrato de v0.3.2 se
