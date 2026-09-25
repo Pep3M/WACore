@@ -68,6 +68,12 @@ export function normalizeMessage(raw: any, opts: NormalizeOptions = {}): Normali
 
   if (esEdicion) normalized.isEdit = true;
 
+  const reenvio = extractForwarding(fuente);
+  if (reenvio) {
+    normalized.isForwarded = true;
+    normalized.forwardingScore = reenvio.score;
+  }
+
   const extras = extractExtras(fuente, type);
   if (extras) normalized.extras = extras;
 
@@ -405,6 +411,23 @@ function extractExtras(raw: any, type: MessageType): Record<string, unknown> | n
     }
     default: return null;
   }
+}
+
+/**
+ * Si el mensaje es un reenvío. WhatsApp lo marca en el `contextInfo` del contenido, que según
+ * el tipo cuelga de `extendedTextMessage`, `imageMessage`, `videoMessage`, etc.; un texto sin
+ * formato (`conversation`) no lleva `contextInfo` y nunca aparece como reenviado.
+ */
+function extractForwarding(raw: any): { score: number } | null {
+  const msg = raw.message ?? {};
+  for (const content of Object.values(msg)) {
+    const context = (content as any)?.contextInfo;
+    if (context?.isForwarded) {
+      const score = Number(context.forwardingScore);
+      return { score: Number.isFinite(score) && score > 0 ? score : 1 };
+    }
+  }
+  return null;
 }
 
 function extractQuoted(raw: any): NormalizedMessage['quotedMessage'] {

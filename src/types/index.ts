@@ -166,6 +166,16 @@ export interface NormalizedMessage {
    * modo que el consumidor reescriba esa burbuja en lugar de añadir una segunda.
    */
   isEdit?: boolean;
+  /**
+   * Lo reenviaron: el remitente no lo escribió, lo pasó desde otro chat (un estado, una
+   * publicidad, una cadena). Solo viaja cuando es `true`.
+   */
+  isForwarded?: boolean;
+  /**
+   * Cuántas veces se reenvió, según WhatsApp (`contextInfo.forwardingScore`). Desde 5 la
+   * app lo muestra como «Reenviado muchas veces». Solo viaja con `isForwarded`.
+   */
+  forwardingScore?: number;
 }
 
 /**

@@ -62,6 +62,11 @@ WEBHOOK_EVENTS=message,connection,qr
 > `message`: solo se envían si `WEBHOOK_EVENTS` incluye `message.edit`, con `event: "message.edit"`
 > y `data.isEdit: true`.
 
+> **Reenvíos.** Un mensaje que el remitente reenvió desde otro chat (un estado, una publicidad,
+> una cadena) llega con `data.isForwarded: true` y `data.forwardingScore` (cuántas veces se
+> reenvió; desde 5 WhatsApp lo muestra como «Reenviado muchas veces»). En los demás mensajes
+> los dos campos no vienen.
+
 Valores aceptados en `WEBHOOK_EVENTS` (separados por coma):
 
 | Valor | Evento(s) entregado(s) |
