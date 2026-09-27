@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/Pep3M/WACore/blob/master/docs/index.md
+    about: API reference, env vars, Docker and examples.
+  - name: 🔒 Report a vulnerability
+    url: https://github.com/Pep3M/WACore/security/advisories/new
+    about: Please report security issues privately.
