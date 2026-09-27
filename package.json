@@ -4,11 +4,14 @@
   "module": "src/index.ts",
   "type": "module",
   "private": true,
+  "engines": {
+    "bun": ">=1.4.2"
+  },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
     "test": "bun test",
-    "postinstall": "node scripts/patch-baileys.cjs"
+    "postinstall": "bun scripts/patch-baileys.cjs"
   },
   "dependencies": {
     "baileys": "7.0.0-rc14",
@@ -17,8 +20,7 @@
     "express": "^4.21.0",
     "ioredis": "^5.10.1",
     "postgres": "^3.4.9",
-    "qrcode-terminal": "^0.12.0",
-    "tsx": "^4.19.0"
+    "qrcode-terminal": "^0.12.0"
   },
   "devDependencies": {
     "@types/bun": "latest",
