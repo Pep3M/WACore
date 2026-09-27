@@ -1,0 +1,61 @@
+<!doctype html>
+<html class="dark">
+<head>
+<meta charset="utf-8">
+<title>WACore banner</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  .canvas { width: 1280px; height: 440px; display: grid; grid-template-columns: 1fr 560px; align-items: center; padding: 0 64px; gap: 40px; }
+  .left { position: relative; z-index: 1; }
+  .wordmark { font-size: 60px; line-height: 1; }
+  h1 { margin-top: 26px; font-size: 38px; line-height: 1.12; letter-spacing: -0.03em; font-weight: 700; }
+  h1 em { font-style: normal; background: linear-gradient(90deg, var(--green-2), var(--green)); -webkit-background-clip: text; color: transparent; }
+  p.sub { margin-top: 14px; font-size: 17.5px; line-height: 1.5; color: var(--muted); max-width: 540px; }
+  .chips { margin-top: 26px; }
+  .right { position: relative; z-index: 1; height: 100%; }
+  .term { position: absolute; top: 62px; right: 0; width: 540px; }
+  .bubble { position: absolute; right: 26px; bottom: 50px; }
+  html, body { background: transparent; }
+  .canvas { border-radius: 22px; border: 1px solid var(--border); }
+  .flow { position: absolute; right: 166px; top: 262px; z-index: 2; line-height: 0; color: var(--green); }
+  .flow span { position: absolute; left: 40px; top: 44px; font-size: 13px; color: var(--muted); white-space: nowrap; font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="left">
+    <div class="brand">
+      <img src="logo.svg" width="64" height="64" alt="">
+      <div class="wordmark">WA<span>Core</span></div>
+    </div>
+    <h1>Your own WhatsApp API.<br><em>One QR scan away.</em></h1>
+    <p class="sub">Send with a REST call. Receive through webhooks, SSE or polling. Self-hosted, typed end to end, running on Bun.</p>
+    <div class="chips">
+      <span class="chip"><i></i>Bun 1.4</span>
+      <span class="chip"><i style="background:var(--blue)"></i>TypeScript</span>
+      <span class="chip"><i style="background:var(--amber)"></i>Docker</span>
+      <span class="chip"><i style="background:var(--pink)"></i>MIT</span>
+    </div>
+  </div>
+  <div class="right">
+    <div class="term">
+      <div class="term-bar"><b></b><b></b><b></b><em>~/my-app</em></div>
+<pre><span class="c-p">$</span> curl -X POST <span class="c-k">localhost:9878/api/send</span> \
+    -H <span class="c-s">"Authorization: Bearer $API_KEY"</span> \
+    -d <span class="c-s">'{"to":"5215512345678","text":"Hi from WACore"}'</span>
+
+<span class="c-o">{"success":true,"data":{"id":"3EB0C25E6A9F"}}</span></pre>
+    </div>
+    <div class="flow">
+      <svg width="290" height="110" viewBox="0 0 290 110" fill="none"><path d="M10 4 C 10 70, 60 88, 268 88" stroke="currentColor" stroke-width="2" stroke-dasharray="5 6" stroke-linecap="round"/><path d="M260 81l9 7-9 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>delivered</span>
+    </div>
+    <div class="bubble">Hi from WACore
+      <div class="meta">12:04
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6l3 3 6-7"/><path d="M7 9l1 1 6.5-8"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 WACore guarda las credenciales de autenticación de WhatsApp para no requerir escanear el QR en cada reinicio. Soporta tres backends:
 
-## File (default)
+## File
 
 ```env
 SESSION_STORE=file

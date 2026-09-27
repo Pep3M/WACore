@@ -1,0 +1,257 @@
+<!doctype html>
+<html class="dark">
+<head>
+<meta charset="utf-8">
+<title>WACore architecture</title>
+<link rel="stylesheet" href="common.css">
+<script>if (location.hash === '#light') document.documentElement.className = 'light';</script>
+<style>
+  html, body { background: transparent; }
+  .canvas { width: 1600px; height: 940px; padding: 44px 48px; border-radius: 22px; border: 1px solid var(--border); }
+  html.light .canvas { background: radial-gradient(900px 500px at 88% 10%, var(--glow), transparent 60%), var(--bg); }
+
+  header { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: center; }
+  header h2 { font-size: 26px; letter-spacing: -0.02em; font-weight: 700; }
+  header h2 small { display: block; font-size: 15px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-top: 4px; }
+  .legend { display: flex; gap: 22px; font-size: 14px; color: var(--muted); }
+  .legend span { display: flex; align-items: center; gap: 8px; }
+  .legend i { width: 26px; height: 3px; border-radius: 2px; display: block; }
+
+  .grid { position: relative; z-index: 1; margin-top: 30px; display: grid; grid-template-columns: 250px 1fr 230px; gap: 96px; height: 770px; }
+  .col-title { font-size: 12.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 14px; }
+
+  .side { display: flex; flex-direction: column; }
+  .side .stack { position: relative; flex: 1; }
+  .stack > * { position: absolute; left: 0; right: 0; }
+  .node {
+    background: var(--surface); border: 1px solid var(--border-2); border-radius: 14px;
+    padding: 16px 18px;
+  }
+  .node b { display: flex; align-items: center; gap: 10px; font-size: 16.5px; font-weight: 600; }
+  .node span { display: block; margin-top: 6px; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+  .node .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+
+  .core {
+    position: relative;
+    border: 1.5px solid color-mix(in srgb, var(--green) 55%, transparent);
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    padding: 18px 22px 22px;
+    display: flex; flex-direction: column; gap: 14px;
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--green) 6%, transparent), 0 40px 100px -40px var(--glow);
+  }
+  .core-head { display: flex; align-items: center; justify-content: space-between; }
+  .core-head .brand { gap: 10px; }
+  .core-head .wordmark { font-size: 22px; }
+  .core-head .tag { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--muted); }
+
+  .layer { border-radius: 14px; padding: 12px 14px 14px; background: var(--bg-2); border: 1px solid var(--border); }
+  .layer h4 { font-size: 11.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .layer h4 em { font-style: normal; font-family: 'JetBrains Mono', monospace; letter-spacing: 0; text-transform: none; color: var(--muted); }
+  .row { display: grid; gap: 10px; }
+  .row.c4 { grid-template-columns: repeat(4, 1fr); }
+  .row.c3 { grid-template-columns: repeat(3, 1fr); }
+  .box { background: var(--surface); border: 1px solid var(--border-2); border-radius: 10px; padding: 11px 12px; }
+  .box b { display: block; font-size: 14.5px; font-weight: 600; }
+  .box span { display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  .box.send { border-color: color-mix(in srgb, var(--green) 60%, transparent); }
+  .box.recv { border-color: color-mix(in srgb, var(--blue) 60%, transparent); }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { font-size: 13px; padding: 6px 11px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border-2); color: var(--text); }
+  .socket { display: flex; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--border-2); border-radius: 10px; padding: 12px 14px; }
+  .socket b { font-size: 15px; }
+  .socket span { font-size: 13px; color: var(--muted); }
+  .socket .mono { font-size: 12.5px; }
+
+  .body { display: grid; grid-template-columns: 250px 1fr; gap: 16px; flex: 1; }
+  .transport { display: flex; flex-direction: column; justify-content: space-between; gap: 10px; border-radius: 14px; padding: 12px 12px 12px; background: var(--bg-2); border: 1px solid var(--border); }
+  .transport h4 { font-size: 11.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); display: flex; justify-content: space-between; }
+  .transport h4 em { font-style: normal; font-family: 'JetBrains Mono', monospace; letter-spacing: 0; text-transform: none; color: var(--muted); }
+  .transport .box { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .inner { display: flex; flex-direction: column; gap: 14px; justify-content: space-between; }
+  .core { height: 100%; }
+  .row.c2 { grid-template-columns: repeat(2, 1fr); }
+  .stores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .store { background: var(--surface); border: 1px solid var(--border-2); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+  .store svg { color: var(--amber); flex: none; }
+  .store b { font-size: 14px; display: block; }
+  .store span { font-size: 12px; color: var(--muted); display: block; }
+
+  .phone {
+    width: 170px; margin: 0 auto; border-radius: 30px; padding: 10px;
+    background: var(--surface-2); border: 1px solid var(--border-2);
+  }
+  .phone-screen { border-radius: 22px; background: var(--bg-2); padding: 14px 10px; display: flex; flex-direction: column; gap: 8px; min-height: 210px; }
+  .phone-screen .notch { width: 56px; height: 6px; border-radius: 3px; background: var(--border-2); margin: 0 auto 8px; }
+  .msg { font-size: 12px; padding: 7px 9px; border-radius: 10px; max-width: 88%; line-height: 1.35; }
+  .msg.in { background: var(--bubble-in); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 3px; }
+  .msg.out { background: var(--bubble-out); align-self: flex-end; border-bottom-right-radius: 3px; }
+
+  svg.links { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: visible; }
+  .lbl { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; paint-order: stroke; stroke: var(--bg); stroke-width: 6px; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<div class="canvas" id="canvas">
+  <header>
+    <h2>How WACore works<small>One process, one WhatsApp line. Your code talks HTTP, WACore talks WhatsApp.</small></h2>
+    <div class="legend">
+      <span><i style="background:var(--green)"></i>outgoing (send)</span>
+      <span><i style="background:var(--blue)"></i>incoming (receive)</span>
+      <span><i style="background:var(--faint)"></i>ops</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- Your stack -->
+    <div class="side">
+      <div class="col-title">Your stack</div>
+      <div class="stack">
+        <div class="node" id="n-backend"><b><i class="dot" style="background:var(--green)"></i>Your backend or bot</b><span>Bun, Node, Python, Go, PHP… anything that speaks HTTP</span></div>
+        <div class="node" id="n-nocode"><b><i class="dot" style="background:var(--blue)"></i>Webhook receivers</b><span>Your API, n8n, Make, Zapier</span></div>
+        <div class="node" id="n-browser"><b><i class="dot" style="background:var(--blue)"></i>Live dashboards</b><span>EventSource in the browser or any SSE client</span></div>
+        <div class="node" id="n-ops"><b><i class="dot" style="background:var(--faint)"></i>Orchestrator</b><span>Docker, Kubernetes, Swarm, uptime monitors</span></div>
+      </div>
+    </div>
+
+    <!-- WACore -->
+    <div class="side">
+      <div class="col-title">Self-hosted</div>
+      <div class="core" id="core">
+        <div class="core-head">
+          <div class="brand"><img src="logo.svg" width="30" height="30" alt=""><div class="wordmark">WA<span>Core</span></div></div>
+          <div class="tag">Bun · TypeScript · Express</div>
+        </div>
+
+        <div class="body">
+        <div class="transport">
+          <h4>Transport <em>:9878</em></h4>
+          <div class="box send" id="b-rest"><b>REST API</b><span>70+ endpoints · Bearer key</span></div>
+          <div class="box recv" id="b-poll"><b>Polling</b><span>GET /api/messages, cursor</span></div>
+          <div class="box recv" id="b-webhook"><b>Webhooks</b><span>HMAC-SHA256 · retries · circuit breaker</span></div>
+          <div class="box recv" id="b-sse"><b>SSE stream</b><span>Real time, server-side filters</span></div>
+          <div class="box" id="b-health"><b>/health</b><span>:9877 · no auth</span></div>
+        </div>
+        <div class="inner">
+        <div class="layer">
+          <h4>Core</h4>
+          <div class="row c2">
+            <div class="box"><b>Message router</b><span>Commands and outgoing queue</span></div>
+            <div class="box"><b>Normalizer</b><span>Typed payload · LID → phone</span></div>
+            <div class="box"><b>Incoming hub</b><span>Buffered with TTL for replay</span></div>
+            <div class="box"><b>Event bus</b><span>Decoupled, typed events</span></div>
+          </div>
+        </div>
+
+        <div class="layer">
+          <h4>Services</h4>
+          <div class="pills">
+            <span class="pill">Sender</span><span class="pill">Presence &amp; typing</span><span class="pill">Media download</span><span class="pill">Read receipts</span><span class="pill">Contacts</span><span class="pill">Groups</span><span class="pill">Labels</span><span class="pill">Templates</span><span class="pill">Catalog</span>
+          </div>
+        </div>
+
+        <div class="socket" id="b-socket">
+          <div><b>Baileys socket</b> <span>&nbsp;WebSocket · multi-device · no browser</span></div>
+          <span class="mono">↻ auto-reconnect</span>
+        </div>
+
+        <div class="layer">
+          <h4>Session &amp; data store</h4>
+          <div class="stores" id="b-stores">
+            <div class="store"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg><div><b>File</b><span>zero config</span></div></div>
+            <div class="store"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8l8-4 8 4-8 4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/></svg><div><b>Redis</b><span>fast, shared</span></div></div>
+            <div class="store"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-13"/><path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/></svg><div><b>PostgreSQL</b><span>auto-migrations</span></div></div>
+          </div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WhatsApp -->
+    <div class="side">
+      <div class="col-title">WhatsApp</div>
+      <div class="stack">
+        <div id="n-phone">
+          <div class="phone"><div class="phone-screen">
+            <div class="notch"></div>
+            <div class="msg in">Hi! Is my order ready?</div>
+            <div class="msg out">Yes, it ships today 📦</div>
+            <div class="msg in">Great, thanks!</div>
+          </div></div>
+          <div style="text-align:center; margin-top:10px; font-size:13px; color:var(--muted)">Your number, linked<br>as a device via QR</div>
+        </div>
+        <div class="node" id="n-wa"><b><i class="dot" style="background:var(--green)"></i>WhatsApp servers</b><span>Same protocol as WhatsApp Web</span></div>
+      </div>
+    </div>
+  </div>
+  <svg class="links" id="links"></svg>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const svg = document.getElementById('links');
+const css = getComputedStyle(document.documentElement);
+const C = (v) => css.getPropertyValue(v).trim();
+
+function pt(id, side, t = 0.5) {
+  const r = document.getElementById(id).getBoundingClientRect();
+  const o = canvas.getBoundingClientRect();
+  const x = r.left - o.left, y = r.top - o.top;
+  switch (side) {
+    case 'l': return [x, y + r.height * t];
+    case 'r': return [x + r.width, y + r.height * t];
+    case 't': return [x + r.width * t, y];
+    case 'b': return [x + r.width * t, y + r.height];
+  }
+}
+
+let n = 0;
+function link(a, b, color, { dash = false, label = '', lx = 0, ly = -10, bend = 0.5, both = false, via = null } = {}) {
+  const [x1, y1] = a, [x2, y2] = b;
+  let d;
+  if (via === 'v') {
+    const my = (y1 + y2) / 2;
+    d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+  } else {
+    const dx = (x2 - x1) * bend;
+    d = `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`;
+  }
+  const id = 'm' + (n++);
+  svg.insertAdjacentHTML('beforeend', `
+    <defs><marker id="${id}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="${color}"/></marker></defs>
+    <path d="${d}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linecap="round" ${dash ? 'stroke-dasharray="6 7"' : ''}
+      marker-end="url(#${id})" ${both ? `marker-start="url(#${id})"` : ''}/>
+    ${[x1, x2].map((x, i) => '').join('')}
+    <circle cx="${x1}" cy="${y1}" r="3.5" fill="${color}" ${both ? 'opacity="0"' : ''}/>`);
+  if (label) {
+    const mx = (x1 + x2) / 2 + lx, my = (y1 + y2) / 2 + ly;
+    svg.insertAdjacentHTML('beforeend', `<text class="lbl" x="${mx}" y="${my}" text-anchor="middle" fill="${color}">${label}</text>`);
+  }
+}
+
+document.fonts.ready.then(() => {
+  const cy = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return r.top + r.height / 2; };
+  const place = (id, y) => { const el = document.getElementById(id); const st = el.parentElement.getBoundingClientRect(); el.style.top = (y - st.top - el.offsetHeight / 2) + 'px'; };
+  place('n-backend', (cy('b-rest') + cy('b-poll')) / 2);
+  place('n-nocode', cy('b-webhook'));
+  place('n-browser', cy('b-sse'));
+  place('n-ops', cy('b-health'));
+  place('n-wa', cy('b-socket'));
+  const ph = document.getElementById('n-phone'); ph.style.top = '40px';
+  const g = C('--green'), b = C('--blue'), f = C('--faint');
+  link(pt('n-backend', 'r', 0.3), pt('b-rest', 'l'), g, { label: 'POST /api/send', lx: -14, ly: -22 });
+  link(pt('b-poll', 'l'), pt('n-backend', 'r', 0.7), b, { label: 'GET /api/messages', lx: -16, ly: 30 });
+  link(pt('b-webhook', 'l'), pt('n-nocode', 'r'), b, { label: 'POST event', ly: -12 });
+  link(pt('b-sse', 'l'), pt('n-browser', 'r'), b, { label: 'event-stream', ly: -12 });
+  link(pt('b-health', 'l'), pt('n-ops', 'r'), f, { dash: true, label: 'GET /health', ly: -12 });
+  link(pt('b-socket', 'r', 0.3), pt('n-wa', 'l', 0.3), g, { label: 'send', ly: -12 });
+  link(pt('n-wa', 'l', 0.7), pt('b-socket', 'r', 0.7), b, { label: 'receive', ly: 26 });
+  link(pt('n-phone', 'b', 0.5).map((v, i) => i ? v + 12 : v), pt('n-wa', 't', 0.5).map((v, i) => i ? v - 6 : v), g, { both: true, via: 'v' });
+  svg.setAttribute('viewBox', `0 0 ${canvas.offsetWidth} ${canvas.offsetHeight}`);
+  svg.setAttribute('width', canvas.offsetWidth); svg.setAttribute('height', canvas.offsetHeight);
+});
+</script>
+</body>
+</html>

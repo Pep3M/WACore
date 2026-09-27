@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="WACore">
+  <defs>
+    <linearGradient id="wa-g" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7ef0ab"/>
+      <stop offset="0.5" stop-color="#25d366"/>
+      <stop offset="1" stop-color="#128c7e"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 5C17.1 5 5 16.4 5 30.5c0 5.2 1.7 10.1 4.5 14.1L6 57.5l13.3-3.6c3.8 2 8.1 3.2 12.7 3.2 14.9 0 27-11.4 27-25.5S46.9 5 32 5z" fill="url(#wa-g)"/>
+  <path d="M32 18.5l10.4 6v12l-10.4 6-10.4-6v-12z" fill="none" stroke="#07100d" stroke-width="3.6" stroke-linejoin="round"/>
+  <circle cx="32" cy="30.5" r="3.8" fill="#07100d"/>
+</svg>

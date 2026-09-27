@@ -11,9 +11,13 @@ docker run -d \
   -p 9878:9878 \
   -e API_KEY=mi-clave-segura \
   -e WA_INSTANCE_NAME=bot-prod \
+  -e SESSION_STORE=file \
   -v wa_sessions:/data/sessions \
   ghcr.io/pep3m/wacore:latest
 ```
+
+> `SESSION_STORE` vale `postgres` por defecto y exige `DATABASE_URL`. Sin base de datos, indica
+> `SESSION_STORE=file` como arriba: si no, el contenedor se detiene al arrancar.
 
 ## Con docker-compose (recomendado)
 
