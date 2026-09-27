@@ -7,7 +7,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [1.6.0] — 2026-09-27
 
 ### Changed
 - **Runtime**: WACore vuelve a correr sobre **Bun** (≥ 1.4.2) en lugar de Node 22 + `tsx`. La imagen
@@ -22,11 +22,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
   e imagen para compartir en redes (`.github/assets/`).
 - `LICENSE` (MIT), `CONTRIBUTING.md`, `SECURITY.md`, plantillas de issues y de PR.
 - Workflow de CI (`ci.yml`): `bun test` con Bun 1.4.2 en cada push a `master` y en cada PR.
+- Cada tag `vX.Y.Z` crea su GitHub Release con las notas de su sección del CHANGELOG
+  (`scripts/changelog-notes.sh`).
 
 ### Fixed
 - Docs: `SESSION_STORE` vale `postgres` por defecto (los docs decían `file`) y `WA_INSTANCE_NAME`
   vale `default`. El `docker run` de ejemplo añade `SESSION_STORE=file`: sin él, el contenedor se
   detenía al arrancar por falta de `DATABASE_URL`.
+- Docs: las imágenes se publican como `ghcr.io/pep3m/wacore:vX.Y.Z` (con `v`).
 
 ---
 
