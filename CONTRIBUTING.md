@@ -42,4 +42,4 @@ docker compose -f docker-compose.dev.yml up
 
 ## Releases
 
-Maintainers cut releases following [SemVer](https://semver.org/): `CHANGELOG.md` and `package.json` are bumped, then a `vX.Y.Z` tag is pushed. The tag triggers the Docker image build on GHCR.
+Maintainers cut releases following [SemVer](https://semver.org/): `CHANGELOG.md` and `package.json` are bumped, then a `vX.Y.Z` tag is pushed. The tag builds the Docker image on GHCR and creates the GitHub release, with its notes taken from the changelog.

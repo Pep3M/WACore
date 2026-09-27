@@ -86,4 +86,4 @@ WACore usa [SemVer](https://semver.org/) estricto: `v<major>.<minor>.<patch>`.
    git push origin master --tags
    ```
 
-5. **El CI (`docker-build.yml`) detecta el tag `v*.*.*`** y genera automáticamente la imagen Docker con ese tag (además de `latest`).
+5. **El CI (`docker-build.yml`) detecta el tag `v*.*.*`**: genera la imagen Docker con ese tag (además de `latest`) y crea la GitHub Release con las notas de esa versión del `CHANGELOG.md` (`scripts/changelog-notes.sh`). Si el CHANGELOG no tiene sección para el tag, el job de release falla.
