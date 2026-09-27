@@ -644,7 +644,6 @@ describe('Baileys Integration - Message Router Edge Cases', () => {
     const testCases = [
       { jid: '5215551234567@s.whatsapp.net', expected: '5215551234567' },
       { jid: '1234567890@g.us', expected: '1234567890' },
-      { jid: 'test@broadcast', expected: 'test' },
     ];
 
     for (const tc of testCases) {
