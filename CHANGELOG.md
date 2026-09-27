@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.1] — 2026-09-27
+
+### Fixed
+- **Recepción**: los estados que publican los contactos (`status@broadcast`) ya no se publican
+  como mensajes. Llegaban al webhook con `phone: "status"` y el consumidor los tomaba por un
+  chat nuevo; tampoco se descarga su media ni pasan por los acuses de lectura.
+
+---
+
 ## [1.5.0] — 2026-09-25
 
 ### Added

@@ -20,6 +20,7 @@ import type { UpsertContact } from '../types/contact';
 import type { EnvConfig, ConnectionStatus, PresenceType, MessageStatusCode, MessageStatusLabel } from '../types';
 import type { Contact } from '../types/contact';
 import { createReconnectionManager } from '../core/reconnection';
+import { esEstado } from '../core/normalize-message';
 
 /**
  * Devuelve el contenido de un mensaje que esta línea envió, si todavía se recuerda.
@@ -707,6 +708,9 @@ export async function createBaileysClient(
 
         let jid = msg.key.remoteJid;
         if (!jid) continue;
+        // Los estados (`status@broadcast`) no son un chat: publicarlos haría que el consumidor
+        // los tome por un mensaje del contacto que los subió.
+        if (esEstado(jid)) continue;
 
         if (isLidUser(jid)) {
           try {
@@ -902,6 +906,7 @@ export async function createBaileysClient(
 
         if (!update.message) continue;
         if (key?.fromMe) continue;
+        if (esEstado(key.remoteJid)) continue;
         const msg = { key, ...update } as any;
         const jid = key.remoteJid;
         if (jid && !jid.includes('@g.us') && !jid.includes('@broadcast') && !jid.endsWith('@newsletter')) {

@@ -20,11 +20,19 @@ export interface NormalizeOptions {
   publishFromMe?: boolean;
 }
 
+/** Los estados que publican los contactos llegan como mensajes de `status@broadcast`. */
+export function esEstado(jid: string | null | undefined): boolean {
+  return typeof jid === 'string' && jid.endsWith('@broadcast');
+}
+
 /** @returns null si el mensaje no se puede o no se debe publicar */
 export function normalizeMessage(raw: any, opts: NormalizeOptions = {}): NormalizedMessage | null {
   const fromMe = raw?.key?.fromMe === true;
 
   if (fromMe && opts.publishFromMe !== true) return null;
+
+  // Un estado (`status@broadcast`) no es un mensaje de ningún chat.
+  if (esEstado(raw?.key?.remoteJid)) return null;
 
   // Una edición no llega como un mensaje más: viene envuelta en `protocolMessage`, con el
   // contenido nuevo dentro y la clave del mensaje **original**. Sin desenvolverla,
