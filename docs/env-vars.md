@@ -4,7 +4,7 @@
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `WA_INSTANCE_NAME` | `bot-dev` | Nombre único de la instancia. Determina la clave en DB o archivo de sesión. |
+| `WA_INSTANCE_NAME` | `default` | Nombre único de la instancia. Determina la clave en DB o archivo de sesión. |
 | `CONNECT_ON_STARTUP` | `true` | Conectar automáticamente al iniciar. Si `false`, espera a llamar a la API. |
 | `LEGACY_SESSION_ENABLED` | `true` | Con `SESSION_STORE=postgres` y el registro de sesiones vacío (base nueva, o tras `DELETE /api/session` y un reinicio), crea la sesión `WA_INSTANCE_NAME`. Con `false` no se crea ninguna sesión automáticamente. |
 | `QR_TIMEOUT` | `60000` | Tiempo máximo (ms) para escanear el QR antes de regenerarlo. |
@@ -28,7 +28,7 @@
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `SESSION_STORE` | `file` | Backend de persistencia: `file`, `redis` o `postgres`. |
+| `SESSION_STORE` | `postgres` | Backend de persistencia: `file`, `redis` o `postgres`. Con `postgres` hace falta `DATABASE_URL`; para probar en local sin base de datos, usa `file`. |
 | `SESSION_DIR` | `/data/sessions` | Directorio para `file` store. |
 | `DATABASE_URL` | — | URL de conexión para PostgreSQL (ej: `postgres://user:pass@host:5432/db`). Requerido si `SESSION_STORE=postgres`. |
 | `REDIS_URL` | `redis://localhost:6379` | URL de conexión para Redis (requerido si `SESSION_STORE=redis`). |

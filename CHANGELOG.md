@@ -7,6 +7,29 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Runtime**: WACore vuelve a correr sobre **Bun** (≥ 1.4.2) en lugar de Node 22 + `tsx`. La imagen
+  Docker parte de `oven/bun:1.4.2-alpine`, instala con `bun.lock` (`--frozen-lockfile`) y arranca con
+  `bun src/index.ts`. `bun start` y `bun run dev` ya no pasan por `tsx`, que deja de ser dependencia.
+  La API, las variables de entorno, los puertos, los volúmenes y el `HEALTHCHECK` (con `curl`) no
+  cambian. El proceso corre como el usuario `bun` (uid 1000, el mismo uid que antes).
+- Se elimina `package-lock.json`: el lockfile es `bun.lock`.
+
+### Added
+- README nuevo en inglés (`README.md`) y en español (`README.es.md`), con diagrama de arquitectura
+  e imagen para compartir en redes (`.github/assets/`).
+- `LICENSE` (MIT), `CONTRIBUTING.md`, `SECURITY.md`, plantillas de issues y de PR.
+- Workflow de CI (`ci.yml`): `bun test` con Bun 1.4.2 en cada push a `master` y en cada PR.
+
+### Fixed
+- Docs: `SESSION_STORE` vale `postgres` por defecto (los docs decían `file`) y `WA_INSTANCE_NAME`
+  vale `default`. El `docker run` de ejemplo añade `SESSION_STORE=file`: sin él, el contenedor se
+  detenía al arrancar por falta de `DATABASE_URL`.
+
+---
+
 ## [1.5.1] — 2026-09-27
 
 ### Fixed

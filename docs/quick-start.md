@@ -2,7 +2,7 @@
 
 ```bash
 # 1. Clonar e instalar dependencias
-git clone <repo> && cd WACore
+git clone https://github.com/Pep3M/WACore.git && cd WACore
 bun install
 
 # 2. Configurar (mínimo: API_KEY)

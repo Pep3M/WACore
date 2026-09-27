@@ -1,0 +1,141 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=block');
+
+:root {
+  --bg: #07100d;
+  --bg-2: #0b1512;
+  --surface: #0f1b17;
+  --surface-2: #13221d;
+  --border: #1f322b;
+  --border-2: #2a453b;
+  --text: #ecf5f0;
+  --muted: #92a9a0;
+  --faint: #5d7569;
+  --green: #25d366;
+  --green-2: #7ef0ab;
+  --teal: #128c7e;
+  --blue: #5ab0ff;
+  --amber: #ffc861;
+  --pink: #ff7eb6;
+  --tick: #53bdeb;
+  --grid: rgba(126, 240, 171, 0.05);
+  --glow: rgba(37, 211, 102, 0.22);
+  --bubble-out: #144d37;
+  --bubble-in: #16241f;
+}
+
+html.light {
+  --bg: #f6faf8;
+  --bg-2: #eef5f1;
+  --surface: #ffffff;
+  --surface-2: #f3f8f5;
+  --border: #d7e5de;
+  --border-2: #bcd3c8;
+  --text: #0c1c16;
+  --muted: #4d6359;
+  --faint: #7f958b;
+  --green: #0fa855;
+  --green-2: #0b8a45;
+  --teal: #0e7b6f;
+  --blue: #1f7fe0;
+  --amber: #c98500;
+  --pink: #d63d83;
+  --tick: #2b9fd8;
+  --grid: rgba(12, 60, 40, 0.05);
+  --glow: rgba(37, 211, 102, 0.16);
+  --bubble-out: #d9fdd3;
+  --bubble-in: #ffffff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(900px 500px at 88% 10%, var(--glow), transparent 60%),
+    radial-gradient(700px 420px at 0% 110%, rgba(90, 176, 255, 0.10), transparent 60%),
+    var(--bg);
+}
+
+.canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse at 60% 40%, #000 30%, transparent 80%);
+  pointer-events: none;
+}
+
+.brand { display: flex; align-items: center; gap: 16px; }
+.brand svg { flex: none; }
+.wordmark { font-weight: 800; letter-spacing: -0.035em; }
+.wordmark span { color: var(--green); }
+
+.chips { display: flex; gap: 10px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid var(--border-2);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  border-radius: 999px;
+  font-size: 14px; font-weight: 500; color: var(--muted);
+}
+.chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: block; }
+
+/* terminal card */
+.term {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--border-2);
+  border-radius: 16px;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.02) inset;
+  overflow: hidden;
+}
+html.light .term { box-shadow: 0 30px 70px -30px rgba(10, 60, 40, 0.35); }
+.term-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.term-bar b { width: 11px; height: 11px; border-radius: 50%; background: var(--border-2); display: block; }
+.term-bar em { margin-left: 10px; font-style: normal; font-size: 12.5px; color: var(--faint); }
+.term pre {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14.5px; line-height: 1.7;
+  padding: 18px 20px;
+  color: var(--text);
+  white-space: pre;
+}
+.c-p { color: var(--green); }
+.c-k { color: var(--blue); }
+.c-s { color: var(--amber); }
+.c-m { color: var(--faint); }
+.c-o { color: var(--green-2); }
+
+/* chat bubble */
+.bubble {
+  display: inline-block;
+  max-width: 320px;
+  padding: 10px 14px 8px;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--bubble-out);
+  color: var(--text);
+  font-size: 16px; line-height: 1.4;
+  box-shadow: 0 12px 40px -12px rgba(0,0,0,0.5);
+  border: 1px solid color-mix(in srgb, var(--green) 25%, transparent);
+}
+.bubble .meta { display: flex; justify-content: flex-end; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.bubble .meta svg { color: var(--tick); }
