@@ -227,7 +227,7 @@ docker compose up -d   # WACore + PostgreSQL + Redis
 - **Persistencia:** en producción usa `SESSION_STORE=postgres` o `redis`, o monta un volumen en `/data` con `file`. Perder la sesión obliga a escanear el QR otra vez.
 - **Salud:** `GET /health` en el puerto `9877` no pide autenticación y devuelve `healthy`, `degraded` o `unhealthy`. La imagen trae un `HEALTHCHECK` de Docker.
 - **Seguridad:** mantén el puerto `9878` en red privada o detrás de un proxy inverso con TLS. Usa una `API_KEY` larga y aleatoria, y comprueba `X-WACore-Signature` en cada webhook.
-- **Imágenes:** cada tag `vX.Y.Z` publica `ghcr.io/pep3m/wacore:X.Y.Z` y `latest`. En producción, fija una versión.
+- **Imágenes:** cada tag `vX.Y.Z` publica `ghcr.io/pep3m/wacore:vX.Y.Z` y `latest`. En producción, fija una versión.
 
 Más: [Docker](docs/docker.md) · [Persistencia de sesión](docs/session-persistence.md) · [Health check](docs/health-check.md) · [Conexión y QR](docs/whatsapp-connection.md)
 

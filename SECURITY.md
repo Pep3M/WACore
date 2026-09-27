@@ -29,4 +29,4 @@ WACore holds the credentials of a real WhatsApp account. Treat the deployment li
 - Don't expose the API port (`9878`) to the internet without a reverse proxy with TLS in front.
 - Set `WEBHOOK_SECRET` and verify `X-WACore-Signature` on every webhook you receive.
 - Protect the session store (`/data/sessions`, Redis or PostgreSQL): anyone with those credentials can act as your number.
-- Pin a Docker image version (`ghcr.io/pep3m/wacore:X.Y.Z`) instead of `latest` in production.
+- Pin a Docker image version (`ghcr.io/pep3m/wacore:vX.Y.Z`) instead of `latest` in production.
