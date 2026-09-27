@@ -48,3 +48,28 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub release from CHANGELOG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "La release $TAG ya existe"; exit 0
+          fi
+          notes="$(scripts/changelog-notes.sh "$TAG")"
+          if [ -z "$notes" ]; then
+            echo "::error::CHANGELOG.md no tiene sección para $TAG"; exit 1
+          fi
+          image="ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]'):${TAG}"
+          printf '%s\n\n---\n\n**Docker**\n\n```bash\ndocker pull %s\n```\n' "$notes" "$image" > notes.md
+          gh release create "$TAG" --title "$TAG" --notes-file notes.md --verify-tag
