@@ -1,4 +1,4 @@
-FROM oven/bun:1.4.2-alpine AS runtime
+FROM oven/bun:1.4.4-alpine AS runtime
 
 WORKDIR /app
 

@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.1] — 2026-10-22
+
+### Security
+- **Bun 1.4.4.** Hasta la 1.4.3, el decodificador Brotli de Bun tiene una escritura fuera de límites
+  que permite ejecutar código (CVE-2026-111497, el mismo fallo que corrigió Node el 2026-10-21). Se
+  llega a él por `fetch()` con respuestas `Content-Encoding: br`, `node:zlib` y
+  `DecompressionStream`. La imagen Docker pasa a `oven/bun:1.4.4-alpine`, el CI a Bun 1.4.4 y el
+  mínimo de `engines` a `>=1.4.4`.
+
 ## [1.6.0] — 2026-09-27
 
 ### Changed

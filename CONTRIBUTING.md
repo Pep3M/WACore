@@ -10,7 +10,7 @@ Thanks for taking the time to help. Issues and pull requests are welcome in **En
 
 ## Local setup
 
-You need [Bun](https://bun.sh) ≥ 1.4.2.
+You need [Bun](https://bun.sh) ≥ 1.4.4.
 
 ```bash
 git clone https://github.com/Pep3M/WACore.git && cd WACore

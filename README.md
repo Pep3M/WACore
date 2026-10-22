@@ -45,7 +45,7 @@ docker run -d --name wacore \
   ghcr.io/pep3m/wacore:latest
 ```
 
-**Or from source** with [Bun](https://bun.sh) ≥ 1.4.2:
+**Or from source** with [Bun](https://bun.sh) ≥ 1.4.4:
 
 ```bash
 git clone https://github.com/Pep3M/WACore.git && cd WACore
